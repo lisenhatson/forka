@@ -1,3 +1,0 @@
-"""
-ForKa Settings Package
-"""
