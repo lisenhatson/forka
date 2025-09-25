@@ -13,6 +13,8 @@ import TopicList from './pages/Forums/TopicList';
 // Components
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
+import ProtectedRoute, { AdminRoute } from './components/auth/ProtectedRoute';
+import RoleManagement from './components/admin/RoleManagement';
 
 function App() {
   return (
