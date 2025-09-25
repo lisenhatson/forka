@@ -19,15 +19,6 @@ services:
       - forka-network
     restart: unless-stopped
 
-  # Redis for caching & sessions
-  redis:
-    image: redis:7-alpine
-    container_name: forka_redis
-    ports:
-      - "6379:6379"
-    networks:
-      - forka-network
-    restart: unless-stopped
 
   # Backend Django
   backend:
@@ -42,14 +33,12 @@ services:
     environment:
       - DEBUG=True
       - DATABASE_URL=postgresql://forka:forka123@db:5432/forka
-      - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=your-super-secret-key-change-in-production
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend
     ports:
       - "8000:8000"
     depends_on:
       - db
-      - redis
     networks:
       - forka-network
     restart: unless-stopped

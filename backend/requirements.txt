@@ -6,8 +6,6 @@ django-environ==0.11.2
 
 # Database
 psycopg2-binary==2.9.9
-redis==5.0.7
-django-redis==5.4.0
 
 # Authentication & Authorization
 djangorestframework-simplejwt==5.3.0
@@ -35,9 +33,6 @@ django-permissions-policy==4.19.0
 django-security==0.21.0
 
 # Utilities
-celery[redis]==5.3.4
-django-celery-beat==2.5.0
-django-celery-results==2.5.1
 requests==2.31.0
 python-decouple==3.8
 
