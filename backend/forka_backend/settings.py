@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-=tvf18tm@x%x&9iavt5+jym6z0=1cqfj$^yrs_cmf-0^9-o0q-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.44.128', '127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -85,8 +85,12 @@ WSGI_APPLICATION = 'forka_backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'forka_db',
+	'USER': 'forka_user',
+	'PASSWORD': 'btskrpdg',
+	'HOST' : 'localhost',
+	'PORT' : '5432',
     }
 }
 
