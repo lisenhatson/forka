@@ -23,7 +23,9 @@ export default {
           blue: '#0EA5E9',
           darkblue: '#075985',
           orange: '#FF6B35',
-        }
+        },
+        // ✅ Tambahan warna untuk mendukung border-border
+        border: '#d1d5db', // abu-abu muda, sama seperti tailwind default gray-300
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

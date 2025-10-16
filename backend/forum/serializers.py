@@ -7,6 +7,9 @@ Version: Simple (nanti bisa di-expand)
 
 from rest_framework import serializers
 from .models import User, Category, Post, Comment, Notification
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
+
 
 
 # ============================================

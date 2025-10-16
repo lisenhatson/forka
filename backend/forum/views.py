@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 
 from .models import User, Category, Post, Comment, Notification
 from .serializers import (
-    UserSerializer, UserDetailSerializer,
+    UserSerializer, UserDetailSerializer, UserRegistrationSerializer, 
     CategorySerializer,
     PostSerializer, PostCreateSerializer,
     CommentSerializer,

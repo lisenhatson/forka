@@ -55,7 +55,7 @@ const RegisterPage = () => {
     const result = await register(formData);
 
     if (result.success) {
-      navigate('/home');
+      navigate('/login');
     } else {
       setErrors(result.errors);
     }
