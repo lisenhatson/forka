@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Github, Instagram, Facebook, Calendar, Edit } from 'lucide-react';
-import useAuthStore from '../stores/authStore';
-import api from '../config/api';
+import useAuthStore from 'src/stores/authStore';
+import api from 'src/config/api';
 
 const ProfilePage = () => {
   const { username } = useParams();

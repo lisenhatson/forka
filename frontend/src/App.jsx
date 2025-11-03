@@ -12,6 +12,11 @@ import PostDetailPage from './pages/PostDetailPage';
 import CreatePostPage from './pages/CreatePostPage';
 import ProfilePage from './pages/ProfilePage';
 
+
+// Admin Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminUsers from './pages/admin/AdminUsers';
+
 // Create QueryClient instance
 const queryClient = new QueryClient({
   defaultOptions: {

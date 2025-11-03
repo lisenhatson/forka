@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, ImagePlus, AlertCircle } from 'lucide-react';
-import useAuthStore from '../stores/authStore';
-import api from '../config/api';
+import useAuthStore from 'src/stores/authStore';
+import api from 'src/config/api';
 
 const CreatePostPage = () => {
   const navigate = useNavigate();

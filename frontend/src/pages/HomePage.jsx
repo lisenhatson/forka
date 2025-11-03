@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Bell, Plus, Eye, MessageSquare, TrendingUp, ChevronDown, Menu } from 'lucide-react';
-import useAuthStore from '../stores/authStore';
-import api from '../config/api';
+import useAuthStore from 'src/stores/authStore';
+import api from 'src/config/api';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -140,6 +140,16 @@ const HomePage = () => {
                     >
                       My Profile
                     </Link>
+
+                    {(user?.role === 'admin' || user?.role === 'moderator') && (
+                      <Link 
+                        to="/admin"
+                        className="block px-4 py-2 text-primary-700 hover:bg-primary-50 font-medium"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        Admin Panel
+                      </Link>
+                    )}
                     <Link 
                       to="/settings"
                       className="block px-4 py-2 text-gray-700 hover:bg-gray-50"
@@ -156,6 +166,7 @@ const HomePage = () => {
                     </button>
                   </div>
                 )}
+
               </div>
             </div>
           </div>
