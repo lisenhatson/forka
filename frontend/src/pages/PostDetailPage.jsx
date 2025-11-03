@@ -190,6 +190,26 @@ const PostDetailPage = () => {
               </div>
             </div>
 
+            {/* Edit/Delete Actions (for owner or admin/moderator) */}
+            {(user?.id === post.author?.id || user?.role === 'admin' || user?.role === 'moderator') && (
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => navigate(`/posts/${post.id}/edit`)}
+                  className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit
+                </button>
+                <button
+                  onClick={handleDeletePost}
+                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            )}
+
             {/* Comments Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">

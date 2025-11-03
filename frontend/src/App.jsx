@@ -12,7 +12,6 @@ import PostDetailPage from './pages/PostDetailPage';
 import CreatePostPage from './pages/CreatePostPage';
 import ProfilePage from './pages/ProfilePage';
 
-
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -32,6 +31,22 @@ const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   
   return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+// ✨ BARU: Admin Route (only for admin/moderator)
+const AdminRoute = ({ children }) => {
+  const { isAuthenticated, user } = useAuthStore();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  
+  // ✅ Cek apakah user adalah admin atau moderator
+  if (user?.role !== 'admin' && user?.role !== 'moderator') {
+    return <Navigate to="/home" />;
+  }
+  
+  return children;
 };
 
 // Guest Route (redirect to home if already logged in)
@@ -116,6 +131,24 @@ function App() {
               <ProtectedRoute>
                 <ProfilePage />
               </ProtectedRoute>
+            } 
+          />
+
+          {/* ✨ BARU: Admin Routes (only for admin/moderator) */}
+          <Route 
+            path="/admin" 
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/users" 
+            element={
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
             } 
           />
 

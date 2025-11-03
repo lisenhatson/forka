@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     
     # Local apps
-    'forum',  # Nanti kita buat app ini
+    'forum',  
 ]
 
 AUTH_USER_MODEL ='forum.User'
