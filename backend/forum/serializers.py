@@ -199,7 +199,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = Post
-        fields = ['title', 'content', 'category']
+        fields = ['id', 'title', 'content', 'category']
+        read_only_fields = ['id']
 
 
 # ============================================
@@ -265,5 +266,3 @@ class NotificationSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'sender', 'created_at']
-
-

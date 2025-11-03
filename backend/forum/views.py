@@ -68,95 +68,93 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = PostSerializer(posts, many=True)
         return Response(serializer.data)
 
-@action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
-def update_profile(self, request):
-    """
-    Update current user profile
-    PUT/PATCH /api/users/update_profile/
-    
-    Request body:
-    {
-        "bio": "New bio",
-        "email": "newemail@example.com",
-        "phone_number": "081234567890"
-    }
-    """
-    user = request.user
-    serializer = UserDetailSerializer(user, data=request.data, partial=True)
-    
-    if serializer.is_valid():
-        # Validate email if changed
-        new_email = request.data.get('email')
-        if new_email and new_email != user.email:
-            if User.objects.filter(email=new_email).exists():
-                return Response(
-                    {'error': 'Email already exists'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
+    def update_profile(self, request):
+        """
+        Update current user profile
+        PUT/PATCH /api/users/update_profile/
         
-        serializer.save()
+        Request body:
+        {
+            "bio": "New bio",
+            "email": "newemail@example.com",
+            "phone_number": "081234567890"
+        }
+        """
+        user = request.user
+        serializer = UserDetailSerializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            # Validate email if changed
+            new_email = request.data.get('email')
+            if new_email and new_email != user.email:
+                if User.objects.filter(email=new_email).exists():
+                    return Response(
+                        {'error': 'Email already exists'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            serializer.save()
+            return Response({
+                'message': 'Profile updated successfully',
+                'user': serializer.data
+            })
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def change_password(self, request):
+        """
+        Change user password
+        POST /api/users/change_password/
+        
+        Request body:
+        {
+            "old_password": "OldPass123!",
+            "new_password": "NewPass123!",
+            "new_password2": "NewPass123!"
+        }
+        """
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        new_password2 = request.data.get('new_password2')
+        
+        # Validations
+        if not old_password or not new_password or not new_password2:
+            return Response(
+                {'error': 'All fields are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not user.check_password(old_password):
+            return Response(
+                {'error': 'Old password is incorrect'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if new_password != new_password2:
+            return Response(
+                {'error': 'New passwords do not match'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate password strength
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response(
+                {'error': list(e.messages)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Change password
+        user.set_password(new_password)
+        user.save()
+        
         return Response({
-            'message': 'Profile updated successfully',
-            'user': serializer.data
+            'message': 'Password changed successfully'
         })
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
-def change_password(self, request):
-    """
-    Change user password
-    POST /api/users/change_password/
-    
-    Request body:
-    {
-        "old_password": "OldPass123!",
-        "new_password": "NewPass123!",
-        "new_password2": "NewPass123!"
-    }
-    """
-    user = request.user
-    old_password = request.data.get('old_password')
-    new_password = request.data.get('new_password')
-    new_password2 = request.data.get('new_password2')
-    
-    # Validations
-    if not old_password or not new_password or not new_password2:
-        return Response(
-            {'error': 'All fields are required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    if not user.check_password(old_password):
-        return Response(
-            {'error': 'Old password is incorrect'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    if new_password != new_password2:
-        return Response(
-            {'error': 'New passwords do not match'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Validate password strength
-    try:
-        validate_password(new_password, user)
-    except ValidationError as e:
-        return Response(
-            {'error': list(e.messages)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Change password
-    user.set_password(new_password)
-    user.save()
-    
-    return Response({
-        'message': 'Password changed successfully'
-    })
-
 
 
 # ============================================
@@ -237,7 +235,27 @@ class PostViewSet(viewsets.ModelViewSet):
         """Auto set author & generate slug"""
         title = serializer.validated_data.get('title')
         slug = slugify(title)
+        
+        # Generate unique slug
+        original_slug = slug
+        counter = 1
+        while Post.objects.filter(slug=slug).exists():
+            slug = f"{original_slug}-{counter}"
+            counter += 1
+        
         serializer.save(author=self.request.user, slug=slug)
+    
+    def create(self, request, *args, **kwargs):
+        """Override create to return full post data"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        # Return full post data using PostSerializer
+        post = Post.objects.get(id=serializer.instance.id)
+        output_serializer = PostSerializer(post)
+        headers = self.get_success_headers(output_serializer.data)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     
     def retrieve(self, request, *args, **kwargs):
         """Increment views saat post dibuka"""
@@ -438,4 +456,3 @@ def register_user(request):
         }, status=status.HTTP_201_CREATED)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
