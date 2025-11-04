@@ -5,5 +5,6 @@ ENV/
 db.sqlite3
 .vscode/
 */migrations/__pycache__/
-/media/profiles
-settings.py
+media/profiles/
+/staticfiles/
+
