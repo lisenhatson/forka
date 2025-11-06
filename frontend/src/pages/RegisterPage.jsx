@@ -43,6 +43,17 @@ const RegisterPage = () => {
     return emailRegex.test(email);
   };
 
+  // ✨ Email censoring function
+  const censorEmail = (email) => {
+    if (!email) return '';
+    const [localPart, domain] = email.split('@');
+    if (!localPart || !domain) return email;
+    
+    // Show first 2 chars, then ***
+    const censored = localPart.substring(0, 2) + '***';
+    return `${censored}@${domain}`;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
@@ -74,9 +85,8 @@ const RegisterPage = () => {
       const response = await api.post('/auth/register/', formData);
       
       // ✅ Show success message with email sensor
-      const censoredEmail = formData.email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
       toast.success(
-        `Verification code sent to ${censoredEmail}`,
+        `Verification code sent to ${censorEmail(formData.email)}`,
         { duration: 5000 }
       );
       
