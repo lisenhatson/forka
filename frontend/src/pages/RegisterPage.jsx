@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
-import useAuthStore from 'src/stores/authStore';
+import { Eye, EyeOff, AlertCircle, CheckCircle, Mail, X } from 'lucide-react';
+import api from 'src/config/api';
+import toast from 'react-hot-toast';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const register = useAuthStore((state) => state.register);
 
   const [formData, setFormData] = useState({
     username: '',
@@ -17,13 +17,18 @@ const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  
+  // ✨ NEW: Email Verification State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendingOtp, setResendingOtp] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
-    // Clear error for this field
     if (errors[e.target.name]) {
       setErrors({
         ...errors,
@@ -52,15 +57,103 @@ const RegisterPage = () => {
       return;
     }
 
-    const result = await register(formData);
+    try {
+      // ✅ Register user - Backend akan kirim email OTP
+      const response = await api.post('/auth/register/', formData);
+      
+      // ✅ Show success message
+      toast.success('Account created! Please check your email for verification code.');
+      
+      // ✅ Show OTP Modal
+      setShowOtpModal(true);
+      
+    } catch (error) {
+      console.error('Registration error:', error);
+      setErrors(error.response?.data || { message: 'Registration failed' });
+      toast.error('Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    if (result.success) {
-      navigate('/login');
-    } else {
-      setErrors(result.errors);
+  // ✨ Handle OTP Input Change
+  const handleOtpChange = (index, value) => {
+    // Only allow numbers
+    if (!/^\d*$/.test(value)) return;
+
+    const newOtp = [...otpCode];
+    newOtp[index] = value;
+    setOtpCode(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  // ✨ Handle OTP Backspace
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  // ✨ Verify OTP
+  const handleVerifyOtp = async () => {
+    const code = otpCode.join('');
+    
+    if (code.length !== 6) {
+      toast.error('Please enter the complete 6-digit code');
+      return;
     }
 
-    setIsLoading(false);
+    setVerifyingOtp(true);
+    try {
+      const response = await api.post('/auth/verify-email/', {
+        email: formData.email,
+        code: code
+      });
+
+      // ✅ Verification successful
+      toast.success('Email verified successfully! 🎉');
+      
+      // ✅ Auto-login with tokens from backend
+      if (response.data.tokens) {
+        localStorage.setItem('access_token', response.data.tokens.access);
+        localStorage.setItem('refresh_token', response.data.tokens.refresh);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      
+      // ✅ Redirect to home
+      setTimeout(() => {
+        navigate('/home');
+      }, 1000);
+      
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      toast.error(error.response?.data?.error || 'Invalid or expired code');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  // ✨ Resend OTP
+  const handleResendOtp = async () => {
+    setResendingOtp(true);
+    try {
+      await api.post('/auth/resend-code/', {
+        email: formData.email
+      });
+      toast.success('New verification code sent to your email!');
+      setOtpCode(['', '', '', '', '', '']); // Clear OTP input
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+      toast.error('Failed to resend code. Please try again.');
+    } finally {
+      setResendingOtp(false);
+    }
   };
 
   return (
@@ -108,9 +201,7 @@ const RegisterPage = () => {
                 src="/polibatam-logo.png" 
                 alt="Polibatam Logo" 
                 className="h-12"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
+                onError={(e) => e.target.style.display = 'none'}
               />
               <h1 className="text-3xl font-bold text-gray-800">ForKa</h1>
             </div>
@@ -190,11 +281,7 @@ const RegisterPage = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               {errors.password && (
@@ -251,25 +338,85 @@ const RegisterPage = () => {
           {/* Login Link */}
           <p className="mt-6 text-center text-gray-600">
             Already have an account?{' '}
-            <Link 
-              to="/login" 
-              className="text-primary-600 hover:text-primary-700 font-semibold"
-            >
+            <Link to="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
               Login
             </Link>
           </p>
 
           {/* Back to Home */}
           <div className="mt-8 text-center">
-            <Link 
-              to="/" 
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
+            <Link to="/" className="text-sm text-gray-500 hover:text-gray-700">
               ← Back to Home
             </Link>
           </div>
         </div>
       </div>
+
+      {/* ✨ OTP Verification Modal */}
+      {showOtpModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative">
+            <button
+              onClick={() => setShowOtpModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-primary-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Verify Your Email
+              </h3>
+              <p className="text-gray-600">
+                We've sent a 6-digit code to<br />
+                <span className="font-semibold text-gray-900">{formData.email}</span>
+              </p>
+            </div>
+
+            {/* OTP Input */}
+            <div className="flex gap-2 justify-center mb-6">
+              {otpCode.map((digit, index) => (
+                <input
+                  key={index}
+                  id={`otp-${index}`}
+                  type="text"
+                  maxLength="1"
+                  value={digit}
+                  onChange={(e) => handleOtpChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition"
+                />
+              ))}
+            </div>
+
+            {/* Verify Button */}
+            <button
+              onClick={handleVerifyOtp}
+              disabled={verifyingOtp || otpCode.join('').length !== 6}
+              className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+            >
+              {verifyingOtp ? 'Verifying...' : 'Verify Email'}
+            </button>
+
+            {/* Resend OTP */}
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">
+                Didn't receive the code?
+              </p>
+              <button
+                onClick={handleResendOtp}
+                disabled={resendingOtp}
+                className="text-primary-600 hover:text-primary-700 font-semibold text-sm disabled:opacity-50"
+              >
+                {resendingOtp ? 'Sending...' : 'Resend Code'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
