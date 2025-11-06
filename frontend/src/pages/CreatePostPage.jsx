@@ -22,13 +22,20 @@ const CreatePostPage = () => {
   }, []);
 
   const fetchCategories = async () => {
-    try {
-      const response = await api.get('/categories/');
-      setCategories(response.data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
-  };
+  try {
+    const response = await api.get('/categories/');
+    
+    // ✅ Gunakan pattern yang sama seperti HomePage.jsx
+    const categoriesData = Array.isArray(response.data) 
+      ? response.data 
+      : response.data.results || [];
+    
+    setCategories(categoriesData);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    setCategories([]); // ✅ Set empty array on error
+  }
+};
 
   const handleChange = (e) => {
     setFormData({
@@ -39,36 +46,33 @@ const CreatePostPage = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!formData.title.trim()) {
-      setError('Title is required');
-      return;
-    }
-    if (!formData.content.trim()) {
-      setError('Content is required');
-      return;
-    }
+  e.preventDefault();
+  
+  // ✅ Hanya validasi title saja, content optional
+  if (!formData.title.trim()) {
+    setError('Title is required');
+    return;
+  }
 
-    setLoading(true);
-    setError('');
+  setLoading(true);
+  setError('');
 
-    try {
-      const response = await api.post('/posts/', {
-        title: formData.title,
-        content: formData.content,
-        category: formData.category || null
-      });
+  try {
+    const response = await api.post('/posts/', {
+      title: formData.title,
+      content: formData.content, // ✅ Bisa kosong
+      category: formData.category || null
+    });
 
-      // Redirect to the created post
-      navigate(`/posts/${response.data.id}`);
-    } catch (error) {
-      console.error('Error creating post:', error);
-      setError(error.response?.data?.detail || 'Failed to create post');
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Redirect to the created post
+    navigate(`/posts/${response.data.id}`);
+  } catch (error) {
+    console.error('Error creating post:', error);
+    setError(error.response?.data?.detail || 'Failed to create post');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSaveDraft = () => {
     // Save to localStorage as draft

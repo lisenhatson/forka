@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, MessageSquare, TrendingUp, ThumbsUp, Send } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Eye, 
+  MessageSquare, 
+  TrendingUp, 
+  ThumbsUp, 
+  Send, 
+  Edit,  // ✅ TAMBAH INI
+  Trash2  // ✅ TAMBAH INI
+} from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
+
 
 const PostDetailPage = () => {
   const { id } = useParams();
@@ -32,15 +42,22 @@ const PostDetailPage = () => {
   };
 
   const fetchComments = async () => {
-    try {
-      const response = await api.get('/comments/', {
-        params: { post: id, top_level: true }
-      });
-      setComments(response.data);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-    }
-  };
+  try {
+    const response = await api.get('/comments/', {
+      params: { post: id, top_level: true }
+    });
+    
+    // ✅ Gunakan pattern yang sama
+    const commentsData = Array.isArray(response.data) 
+      ? response.data 
+      : response.data.results || [];
+    
+    setComments(commentsData);
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    setComments([]); // ✅ Set empty array on error
+  }
+};
 
   const handleLikePost = async () => {
     try {
@@ -67,6 +84,20 @@ const PostDetailPage = () => {
       console.error('Error submitting comment:', error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!window.confirm('Are you sure you want to delete this post?')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/posts/${id}/`);
+      navigate('/home');
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Failed to delete post');
     }
   };
 
