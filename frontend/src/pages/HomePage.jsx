@@ -157,13 +157,24 @@ const HomePage = () => {
                       My Profile
                     </Link>
 
-                   {(user?.role === 'admin' || user?.role === 'moderator') && (
+                   {/* Admin/Moderator Panel Link */}
+                   {user?.role === 'admin' && (
                     <Link 
                       to="/admin"
                       className="block px-4 py-2 text-primary-700 hover:bg-primary-50 font-medium"
                       onClick={() => setShowUserMenu(false)}
                     >
                       🛡️ Admin Panel
+                    </Link>
+                  )}
+                  
+                  {user?.role === 'moderator' && (
+                    <Link 
+                      to="/moderator"
+                      className="block px-4 py-2 text-purple-700 hover:bg-purple-50 font-medium"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      🛡️ Moderator Panel
                     </Link>
                   )}
                     <Link 

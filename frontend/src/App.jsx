@@ -15,6 +15,10 @@ import ProfilePage from './pages/ProfilePage';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminPosts from './pages/admin/AdminPosts';
+
+// Moderator Pages
+import ModeratorDashboard from './pages/moderator/ModeratorDashboard';
 
 // Create QueryClient instance
 const queryClient = new QueryClient({

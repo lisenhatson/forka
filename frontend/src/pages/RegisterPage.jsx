@@ -37,6 +37,12 @@ const RegisterPage = () => {
     }
   };
 
+ // ✨ Email validation function
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
@@ -44,6 +50,12 @@ const RegisterPage = () => {
 
     // Client-side validation
     const newErrors = {};
+    
+    // ✨ Email validation
+    if (!isValidEmail(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+    
     if (formData.password !== formData.password2) {
       newErrors.password2 = "Passwords don't match";
     }
@@ -61,8 +73,12 @@ const RegisterPage = () => {
       // ✅ Register user - Backend akan kirim email OTP
       const response = await api.post('/auth/register/', formData);
       
-      // ✅ Show success message
-      toast.success('Account created! Please check your email for verification code.');
+      // ✅ Show success message with email sensor
+      const censoredEmail = formData.email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
+      toast.success(
+        `Verification code sent to ${censoredEmail}`,
+        { duration: 5000 }
+      );
       
       // ✅ Show OTP Modal
       setShowOtpModal(true);
