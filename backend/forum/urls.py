@@ -1,3 +1,4 @@
+# backend/forum/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
@@ -6,10 +7,13 @@ from .views import (
     PostViewSet,
     CommentViewSet,
     NotificationViewSet,
-    register_user  # Import function baru
 )
-
-
+from .views_auth import (
+    register_user,
+    verify_email,
+    resend_verification_code,
+    login_user,
+)
 
 # Router untuk automatic URL routing
 router = DefaultRouter()
@@ -20,8 +24,11 @@ router.register(r'comments', CommentViewSet, basename='comment')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
-    # Registration endpoint
-    path('register/', register_user, name='register'),
+    # ✨ Secure Authentication Endpoints
+    path('auth/register/', register_user, name='register'),
+    path('auth/verify-email/', verify_email, name='verify_email'),
+    path('auth/resend-code/', resend_verification_code, name='resend_code'),
+    path('auth/login/', login_user, name='login'),
     
     # Router URLs
     path('', include(router.urls)),
@@ -29,55 +36,62 @@ urlpatterns = [
 
 """
 ==============================================
-COMPLETE API ENDPOINTS SUMMARY
+SECURE API ENDPOINTS SUMMARY
 ==============================================
 
-AUTHENTICATION:
-  POST   /api/token/                    - Login (get access & refresh token)
-  POST   /api/token/refresh/            - Refresh access token
-  POST   /api/register/                 - Register new user ✨ NEW
+AUTHENTICATION (Rate Limited):
+  POST   /api/auth/register/          - Register (3/hour per IP)
+  POST   /api/auth/verify-email/      - Verify email code (10/hour)
+  POST   /api/auth/resend-code/       - Resend verification (10/hour)
+  POST   /api/auth/login/             - Login (5/minute)
+  POST   /api/token/refresh/          - Refresh JWT token
 
 USERS:
-  GET    /api/users/                    - List users
-  GET    /api/users/{id}/               - User detail
-  GET    /api/users/me/                 - Current user info
-  GET    /api/users/my_posts/           - Current user's posts
-  PUT    /api/users/update_profile/     - Update profile ✨ NEW
-  POST   /api/users/change_password/    - Change password ✨ NEW
+  GET    /api/users/                  - List users (paginated)
+  GET    /api/users/{id}/             - User detail
+  GET    /api/users/me/               - Current user info
+  PUT    /api/users/update_profile/   - Update profile
+  POST   /api/users/change_password/  - Change password
 
 CATEGORIES:
-  GET    /api/categories/               - List categories
-  POST   /api/categories/               - Create category (admin)
-  GET    /api/categories/{slug}/        - Category detail
-  PUT    /api/categories/{slug}/        - Update category (admin)
-  DELETE /api/categories/{slug}/        - Delete category (admin)
-  GET    /api/categories/{slug}/posts/  - Posts in category
+  GET    /api/categories/             - List categories
+  POST   /api/categories/             - Create (admin only)
+  GET    /api/categories/{slug}/      - Category detail
+  PUT    /api/categories/{slug}/      - Update (admin only)
 
-POSTS:
-  GET    /api/posts/                    - List posts
-  POST   /api/posts/                    - Create post
-  GET    /api/posts/{id}/               - Post detail
-  PUT    /api/posts/{id}/               - Update post
-  DELETE /api/posts/{id}/               - Delete post
-  POST   /api/posts/{id}/like/          - Like/unlike post
-  POST   /api/posts/{id}/pin/           - Pin/unpin post (mod/admin)
-  POST   /api/posts/{id}/close/         - Close/open post (mod/admin)
+POSTS (XSS Protected):
+  GET    /api/posts/                  - List posts (paginated)
+  POST   /api/posts/                  - Create post
+  GET    /api/posts/{id}/             - Post detail
+  PUT    /api/posts/{id}/             - Update post
+  DELETE /api/posts/{id}/             - Delete post
+  POST   /api/posts/{id}/like/        - Like post
+  POST   /api/posts/{id}/pin/         - Pin (mod/admin)
+  POST   /api/posts/{id}/close/       - Close (mod/admin)
 
-COMMENTS:
-  GET    /api/comments/                 - List comments
-  POST   /api/comments/                 - Create comment
-  GET    /api/comments/{id}/            - Comment detail
-  PUT    /api/comments/{id}/            - Update comment
-  DELETE /api/comments/{id}/            - Delete comment
-  POST   /api/comments/{id}/like/       - Like/unlike comment
-  GET    /api/comments/{id}/replies/    - Get replies
+COMMENTS (XSS Protected):
+  GET    /api/comments/               - List comments
+  POST   /api/comments/               - Create comment
+  GET    /api/comments/{id}/          - Comment detail
+  PUT    /api/comments/{id}/          - Update comment
+  DELETE /api/comments/{id}/          - Delete comment
+  POST   /api/comments/{id}/like/     - Like comment
+  GET    /api/comments/{id}/replies/  - Get replies
 
 NOTIFICATIONS:
-  GET    /api/notifications/            - List notifications
-  GET    /api/notifications/{id}/       - Notification detail
-  POST   /api/notifications/{id}/mark_read/     - Mark as read
-  POST   /api/notifications/mark_all_read/      - Mark all as read
+  GET    /api/notifications/                - List notifications
+  POST   /api/notifications/{id}/mark_read/ - Mark as read
+  POST   /api/notifications/mark_all_read/  - Mark all read
 
-ADMIN:
-  GET    /admin/                        - Django admin panel
+SECURITY FEATURES:
+✅ Rate Limiting (prevents brute force)
+✅ Email Verification (v2l)
+✅ Account Lockout (5 failed = 15 min lock)
+✅ XSS Protection (input sanitization)
+✅ SQL Injection Protection (Django ORM)
+✅ CSRF Protection (enabled)
+✅ JWT Token Authentication
+✅ Secure Password Requirements
+✅ HTTPS Ready (production)
+✅ Security Headers (XSS, Content-Type, Frame)
 """

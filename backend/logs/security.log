@@ -1,0 +1,3 @@
+WARNING 2025-11-06 16:30:47,185 log Forbidden (Origin checking failed - http://localhost:5173 does not match any trusted origins.): /api/register/
+WARNING 2025-11-06 16:30:49,328 log Forbidden (Origin checking failed - http://localhost:5173 does not match any trusted origins.): /api/register/
+WARNING 2025-11-06 16:34:41,015 log Forbidden (CSRF cookie not set.): /api/register/

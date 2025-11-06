@@ -101,16 +101,16 @@ class CanDeleteAnyComment(permissions.BasePermission):
 class PostPermission(permissions.BasePermission):
     """
     Combined permission untuk Post:
-    - Semua orang bisa baca (GET)
+    - Semua orang bisa baca (GET) - TERMASUK ADMIN
     - Authenticated user bisa buat post (POST)
     - Owner bisa edit/delete post sendiri (PUT/PATCH/DELETE)
     - Moderator/Admin bisa edit/delete post siapa aja
     - Moderator/Admin bisa pin/close post
     """
     def has_permission(self, request, view):
-        # Read permission untuk semua orang
+        # ✅ PENTING: Read permission untuk SEMUA authenticated users (termasuk admin)
         if request.method in permissions.SAFE_METHODS:
-            return True
+            return request.user.is_authenticated  # Hanya perlu login
         
         # Create post butuh authentication
         if request.method == 'POST':
@@ -119,9 +119,9 @@ class PostPermission(permissions.BasePermission):
         return True
     
     def has_object_permission(self, request, view, obj):
-        # Read permission untuk semua
+        # Read permission untuk semua authenticated users
         if request.method in permissions.SAFE_METHODS:
-            return True
+            return request.user.is_authenticated
         
         # Moderator/Admin bisa edit/delete/pin/close semua post
         if request.user.role in ['moderator', 'admin']:
@@ -140,14 +140,15 @@ class PostPermission(permissions.BasePermission):
 class CommentPermission(permissions.BasePermission):
     """
     Combined permission untuk Comment:
-    - Semua orang bisa baca
+    - Semua orang bisa baca - TERMASUK ADMIN
     - Authenticated user bisa comment
     - Owner bisa edit/delete comment sendiri
     - Moderator/Admin bisa delete comment siapa aja
     """
     def has_permission(self, request, view):
+        # ✅ Read permission untuk semua authenticated users
         if request.method in permissions.SAFE_METHODS:
-            return True
+            return request.user.is_authenticated
         
         if request.method == 'POST':
             return request.user.is_authenticated
@@ -156,7 +157,7 @@ class CommentPermission(permissions.BasePermission):
     
     def has_object_permission(self, request, view, obj):
         if request.method in permissions.SAFE_METHODS:
-            return True
+            return request.user.is_authenticated
         
         # Moderator/Admin bisa edit/delete semua comment
         if request.user.role in ['moderator', 'admin']:

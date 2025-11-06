@@ -12,6 +12,7 @@ const HomePage = () => {
   const [filter, setFilter] = useState('new');
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false); // ✨ NEW
 
   useEffect(() => {
     fetchPosts();
@@ -53,8 +54,16 @@ const HomePage = () => {
     }
   };
 
+  // ✨ NEW: Show logout confirmation modal
   const handleLogout = () => {
+    setShowLogoutModal(true);
+    setShowUserMenu(false);
+  };
+
+  // ✨ NEW: Confirm logout
+  const confirmLogout = () => {
     logout();
+    setShowLogoutModal(false);
     navigate('/login');
   };
 
@@ -389,6 +398,30 @@ const HomePage = () => {
           </aside>
         </div>
       </div>
+
+      {/* ✨ NEW: Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm mx-4">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Logout</h3>
+            <p className="text-gray-600 mb-6">Are you sure you want to logout from ForKa?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLogout}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
