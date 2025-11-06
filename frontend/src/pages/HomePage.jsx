@@ -26,9 +26,16 @@ const HomePage = () => {
           ordering: filter === 'new' ? '-created_at' : filter === 'top' ? '-views_count' : '-created_at'
         }
       });
-      setPosts(response.data);
+      
+      // ✅ Handle both paginated and non-paginated response
+      const postsData = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.results || [];
+      
+      setPosts(postsData);
     } catch (error) {
       console.error('Error fetching posts:', error);
+      setPosts([]); // ✅ Set empty array on error
     } finally {
       setLoading(false);
     }
