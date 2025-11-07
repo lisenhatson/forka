@@ -31,6 +31,8 @@ urlpatterns = [
 # Media files (untuk development)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # ✅ Add static files serving
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 """
 API Endpoints Summary:

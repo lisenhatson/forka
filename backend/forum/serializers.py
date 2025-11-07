@@ -41,8 +41,10 @@ class UserSerializer(serializers.ModelSerializer):
         if obj.profile_picture:
             request = self.context.get('request')
             if request:
+                # ✅ Build absolute URI untuk media file
                 return request.build_absolute_uri(obj.profile_picture.url)
-            return obj.profile_picture.url
+            # ✅ Fallback: return relative URL
+            return f"http://localhost:8000{obj.profile_picture.url}"
         return None
 
 

@@ -32,12 +32,12 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
 
       setProfileImage(file);
       
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+      // ✅ Create preview with URL.createObjectURL untuk avoid CORS
+      const preview = URL.createObjectURL(file);
+      setImagePreview(preview);
+      
+      // ✅ Clean up object URL when component unmounts
+      return () => URL.revokeObjectURL(preview);
     }
   };
 

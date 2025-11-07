@@ -12,12 +12,19 @@ const api = axios.create({
 });
 
 // Request interceptor - add token to headers
+// Request interceptor - add token to headers
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // ✅ Add CORS headers for media uploads
+    if (config.data instanceof FormData) {
+      config.headers['Content-Type'] = 'multipart/form-data';
+    }
+    
     return config;
   },
   (error) => {
