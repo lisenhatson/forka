@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
+
 from .models import User, Category, Post, Comment, Notification
 from .serializers import (
     UserSerializer, UserDetailSerializer, UserRegistrationSerializer, 

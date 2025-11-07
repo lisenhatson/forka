@@ -1,3 +1,4 @@
+// frontend/src/pages/admin/AdminPosts.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 

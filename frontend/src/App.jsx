@@ -139,7 +139,7 @@ function App() {
           />
 
           {/* ✨ BARU: Admin Routes (only for admin/moderator) */}
-          <Route 
+           <Route 
             path="/admin" 
             element={
               <AdminRoute>
@@ -152,6 +152,14 @@ function App() {
             element={
               <AdminRoute>
                 <AdminUsers />
+              </AdminRoute>
+            } 
+          />
+          <Route 
+            path="/admin/posts" 
+            element={
+              <AdminRoute>
+                <AdminPosts />
               </AdminRoute>
             } 
           />
