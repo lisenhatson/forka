@@ -17,10 +17,6 @@ from django.contrib.auth.password_validation import validate_password
 # ============================================
 
 class UserSerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk User model
-    Basic info aja dulu
-    """
     profile_picture = serializers.SerializerMethodField()
     
     class Meta:
@@ -41,18 +37,14 @@ class UserSerializer(serializers.ModelSerializer):
         if obj.profile_picture:
             request = self.context.get('request')
             if request:
-                # ✅ Build absolute URI untuk media file
+                # ✅ Build absolute URI
                 return request.build_absolute_uri(obj.profile_picture.url)
-            # ✅ Fallback: return relative URL
+            # ✅ Fallback jika tidak ada request context
             return f"http://localhost:8000{obj.profile_picture.url}"
         return None
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk User detail (lebih lengkap)
-    Dipakai untuk profile page
-    """
     posts_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()  # ✅ ADD THIS
@@ -65,7 +57,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'email',
             'role',
             'bio',
-            'profile_picture',  # ✅ UPDATED
+            'profile_picture',
             'phone_number',
             'date_joined',
             'posts_count',
@@ -74,11 +66,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_joined']
     
     def get_posts_count(self, obj):
-        """Hitung jumlah post user"""
         return obj.posts.count()
     
     def get_comments_count(self, obj):
-        """Hitung jumlah comment user"""
         return obj.comments.count()
     
     def get_profile_picture(self, obj):
@@ -87,8 +77,9 @@ class UserDetailSerializer(serializers.ModelSerializer):
             request = self.context.get('request')
             if request:
                 return request.build_absolute_uri(obj.profile_picture.url)
-            return obj.profile_picture.url
+            return f"http://localhost:8000{obj.profile_picture.url}"
         return None
+
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """

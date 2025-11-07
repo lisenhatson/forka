@@ -1,4 +1,7 @@
-import { useState, useRef } from 'react';
+// frontend/src/components/EditProfileModal.jsx
+// ✅ FIXED VERSION
+
+import { useState, useRef, useEffect } from 'react';
 import { X, Camera, Upload } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
@@ -15,60 +18,67 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
+  // ✅ FIX: Handle image change
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image size should be less than 5MB');
-        return;
-      }
+    if (!file) return;
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select an image file');
-        return;
-      }
-
-      setProfileImage(file);
-      
-      // ✅ Create preview with URL.createObjectURL untuk avoid CORS
-      const preview = URL.createObjectURL(file);
-      setImagePreview(preview);
-      
-      // ✅ Clean up object URL when component unmounts
-      return () => URL.revokeObjectURL(preview);
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
     }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    setProfileImage(file);
+    
+    // ✅ Create preview URL
+    const preview = URL.createObjectURL(file);
+    setImagePreview(preview);
   };
 
+  // ✅ Clean up preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  // ✅ FIX: Handle submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // ✅ Create FormData
       const formDataToSend = new FormData();
       formDataToSend.append('bio', formData.bio);
       formDataToSend.append('phone_number', formData.phone_number);
       
+      // ✅ Only append image if new one is selected
       if (profileImage) {
         formDataToSend.append('profile_picture', profileImage);
       }
 
+      // ✅ Use PATCH method (partial update)
       const response = await api.patch(
         `/users/${currentUser.id}/`,
-        formDataToSend,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
+        formDataToSend
+        // ✅ Headers akan auto-set oleh axios interceptor
       );
 
-      // Update user in store
+      // ✅ Update user in store & local state
       updateUser(response.data);
+      onUpdate(response.data);
       
       toast.success('Profile updated successfully! 🎉');
-      onUpdate(response.data);
       onClose();
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -102,6 +112,11 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
                     src={imagePreview} 
                     alt="Profile" 
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('Image load error:', e);
+                      e.target.src = ''; // Clear broken image
+                      e.target.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-primary-500 flex items-center justify-center text-white text-4xl font-bold">

@@ -34,78 +34,46 @@ from .permissions import (
 # ============================================
 
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint untuk Users
-    GET /api/users/ - List users
-    GET /api/users/{id}/ - User detail
-    """
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
     
     def get_serializer_class(self):
-        """Pakai serializer berbeda untuk detail"""
         if self.action == 'retrieve':
             return UserDetailSerializer
         return UserSerializer
     
+    # ✅ TAMBAHKAN METHOD INI (PENTING!)
     def get_serializer_context(self):
-        """Tambahkan request ke context serializer - ✅ NEW METHOD"""
+        """Pass request context to serializer"""
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
     
     def retrieve(self, request, *args, **kwargs):
-        """Override retrieve untuk pastikan context ada - ✅ UPDATED"""
+        """Override retrieve to ensure context"""
         instance = self.get_object()
-        serializer = self.get_serializer(instance)  # Otomatis pakai context dari get_serializer_context
+        serializer = self.get_serializer(instance)  # ✅ Auto use context
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        """
-        Get current user info
-        GET /api/users/me/
-        """
+        """Get current user info"""
         serializer = UserDetailSerializer(
             request.user, 
-            context={'request': request}  # ✅ PASS CONTEXT
+            context={'request': request}  # ✅ PASS REQUEST
         )
         return Response(serializer.data)
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
-    def my_posts(self, request):
-        """
-        Get posts dari current user
-        GET /api/users/my_posts/
-        """
-        posts = Post.objects.filter(author=request.user)
-        serializer = PostSerializer(
-            posts, 
-            many=True, 
-            context={'request': request}  # ✅ PASS CONTEXT (jika PostSerializer butuh)
-        )
-        return Response(serializer.data)
-
     @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
     def update_profile(self, request):
-        """
-        Update current user profile
-        PUT/PATCH /api/users/update_profile/
-        
-        Request body:
-        {
-            "bio": "New bio",
-            "email": "newemail@example.com",
-            "phone_number": "081234567890"
-        }
-        """
+        """Update current user profile"""
         user = request.user
         serializer = UserDetailSerializer(
             user, 
             data=request.data, 
             partial=True,
-            context={'request': request}  # ✅ PASS CONTEXT
+            context={'request': request}  # ✅ PASS REQUEST
         )
         
         if serializer.is_valid():
