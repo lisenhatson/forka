@@ -193,6 +193,27 @@ FILE_UPLOAD_PERMISSIONS = 0o644
 
 
 # ============================================
+# ✅ AUTO CREATE MEDIA FOLDERS
+# ============================================
+
+def create_media_folders():
+    """Automatically create media folders if they don't exist"""
+    folders = [
+        MEDIA_ROOT / 'profiles',
+        BASE_DIR / 'staticfiles',
+        BASE_DIR / 'logs',
+    ]
+    
+    for folder in folders:
+        if not folder.exists():
+            folder.mkdir(parents=True, exist_ok=True)
+            print(f"✅ Created folder: {folder}")
+
+# Call on startup
+create_media_folders()
+
+
+# ============================================
 # REST FRAMEWORK (Secure Configuration)
 # ============================================
 

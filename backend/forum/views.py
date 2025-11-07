@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import User, Category, Post, Comment, Notification
 from .serializers import (

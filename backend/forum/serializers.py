@@ -37,9 +37,7 @@ class UserSerializer(serializers.ModelSerializer):
         if obj.profile_picture:
             request = self.context.get('request')
             if request:
-                # ✅ Build absolute URI
                 return request.build_absolute_uri(obj.profile_picture.url)
-            # ✅ Fallback jika tidak ada request context
             return f"http://localhost:8000{obj.profile_picture.url}"
         return None
 
@@ -47,7 +45,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     posts_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
-    profile_picture = serializers.SerializerMethodField()  # ✅ ADD THIS
+    profile_picture = serializers.SerializerMethodField()
     
     class Meta:
         model = User
@@ -79,6 +77,30 @@ class UserDetailSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.profile_picture.url)
             return f"http://localhost:8000{obj.profile_picture.url}"
         return None
+
+
+# ✅ TAMBAHKAN: Serializer khusus untuk update profile
+class UserUpdateSerializer(serializers.ModelSerializer):
+    """Serializer untuk update user profile termasuk photo"""
+    
+    class Meta:
+        model = User
+        fields = ['bio', 'phone_number', 'profile_picture']
+    
+    def update(self, instance, validated_data):
+        # ✅ Handle file upload
+        instance.bio = validated_data.get('bio', instance.bio)
+        instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        
+        # ✅ Update profile picture jika ada
+        if 'profile_picture' in validated_data:
+            # Hapus old image jika ada
+            if instance.profile_picture:
+                instance.profile_picture.delete(save=False)
+            instance.profile_picture = validated_data.get('profile_picture')
+        
+        instance.save()
+        return instance
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
