@@ -21,6 +21,8 @@ class UserSerializer(serializers.ModelSerializer):
     Serializer untuk User model
     Basic info aja dulu
     """
+    profile_picture = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
         fields = [
@@ -33,6 +35,15 @@ class UserSerializer(serializers.ModelSerializer):
             'date_joined',
         ]
         read_only_fields = ['id', 'date_joined']
+    
+    def get_profile_picture(self, obj):
+        """Return full URL untuk profile picture"""
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
@@ -42,6 +53,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
     """
     posts_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()  # ✅ ADD THIS
     
     class Meta:
         model = User
@@ -51,7 +63,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'email',
             'role',
             'bio',
-            'profile_picture',
+            'profile_picture',  # ✅ UPDATED
             'phone_number',
             'date_joined',
             'posts_count',
@@ -66,6 +78,15 @@ class UserDetailSerializer(serializers.ModelSerializer):
     def get_comments_count(self, obj):
         """Hitung jumlah comment user"""
         return obj.comments.count()
+    
+    def get_profile_picture(self, obj):
+        """Return full URL untuk profile picture"""
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """

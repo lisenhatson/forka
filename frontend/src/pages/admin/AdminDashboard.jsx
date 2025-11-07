@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
+import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
   const { user } = useAuthStore();
@@ -18,6 +19,7 @@ const AdminDashboard = () => {
     recentPosts: [],
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchStats();
@@ -25,22 +27,40 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
+      setError(null);
+      
+      // ✅ Fetch data with proper error handling
       const [usersRes, postsRes, categoriesRes] = await Promise.all([
-        api.get('/users/'),
-        api.get('/posts/'),
-        api.get('/categories/'),
+        api.get('/users/').catch(() => ({ data: [] })),
+        api.get('/posts/').catch(() => ({ data: [] })),
+        api.get('/categories/').catch(() => ({ data: [] })),
       ]);
 
+      // ✅ Handle both paginated and non-paginated responses
+      const usersData = Array.isArray(usersRes.data) 
+        ? usersRes.data 
+        : usersRes.data.results || [];
+      
+      const postsData = Array.isArray(postsRes.data) 
+        ? postsRes.data 
+        : postsRes.data.results || [];
+      
+      const categoriesData = Array.isArray(categoriesRes.data) 
+        ? categoriesRes.data 
+        : categoriesRes.data.results || [];
+
       setStats({
-        totalUsers: usersRes.data.length,
-        totalPosts: postsRes.data.length,
-        totalComments: postsRes.data.reduce((acc, post) => acc + (post.comments_count || 0), 0),
-        totalCategories: categoriesRes.data.length,
-        recentUsers: usersRes.data.slice(0, 5),
-        recentPosts: postsRes.data.slice(0, 5),
+        totalUsers: usersData.length,
+        totalPosts: postsData.length,
+        totalComments: postsData.reduce((acc, post) => acc + (post.comments_count || 0), 0),
+        totalCategories: categoriesData.length,
+        recentUsers: usersData.slice(0, 5),
+        recentPosts: postsData.slice(0, 5),
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setError('Failed to load dashboard data');
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -52,6 +72,23 @@ const AdminDashboard = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg mb-4">{error}</p>
+          <button 
+            onClick={fetchStats}
+            className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -113,7 +150,6 @@ const AdminDashboard = () => {
             value={stats.totalCategories}
             icon={<FolderOpen className="w-8 h-8" />}
             color="orange"
-            link="/admin/categories"
           />
         </div>
 
@@ -129,24 +165,28 @@ const AdminDashboard = () => {
                 View All
               </Link>
             </div>
-            <div className="space-y-3">
-              {stats.recentUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
-                      {user.username?.charAt(0).toUpperCase()}
+            {stats.recentUsers.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No users yet</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.recentUsers.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
+                        {user.username?.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{user.username}</p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{user.username}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
-                    </div>
+                    <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
+                      {user.role || 'user'}
+                    </span>
                   </div>
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
-                    {user.role}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Recent Posts */}
@@ -160,25 +200,29 @@ const AdminDashboard = () => {
                 View All
               </Link>
             </div>
-            <div className="space-y-3">
-              {stats.recentPosts.map((post) => (
-                <div key={post.id} className="p-3 hover:bg-gray-50 rounded-lg transition">
-                  <Link 
-                    to={`/posts/${post.id}`}
-                    className="font-medium text-gray-900 hover:text-primary-600 line-clamp-1"
-                  >
-                    {post.title}
-                  </Link>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>by @{post.author?.username}</span>
-                    <span>•</span>
-                    <span>{post.views_count} views</span>
-                    <span>•</span>
-                    <span>{post.comments_count} comments</span>
+            {stats.recentPosts.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No posts yet</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.recentPosts.map((post) => (
+                  <div key={post.id} className="p-3 hover:bg-gray-50 rounded-lg transition">
+                    <Link 
+                      to={`/posts/${post.id}`}
+                      className="font-medium text-gray-900 hover:text-primary-600 line-clamp-1"
+                    >
+                      {post.title}
+                    </Link>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                      <span>by @{post.author?.username}</span>
+                      <span>•</span>
+                      <span>{post.views_count || 0} views</span>
+                      <span>•</span>
+                      <span>{post.comments_count || 0} comments</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -208,16 +252,16 @@ const AdminDashboard = () => {
               </div>
             </Link>
 
-            <Link
-              to="/admin/categories"
-              className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition"
+            <button
+              onClick={fetchStats}
+              className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition text-left"
             >
-              <FolderOpen className="w-6 h-6 text-primary-600" />
+              <Activity className="w-6 h-6 text-primary-600" />
               <div>
-                <p className="font-medium text-gray-900">Manage Categories</p>
-                <p className="text-sm text-gray-500">Create or edit categories</p>
+                <p className="font-medium text-gray-900">Refresh Data</p>
+                <p className="text-sm text-gray-500">Update dashboard statistics</p>
               </div>
-            </Link>
+            </button>
           </div>
         </div>
       </div>

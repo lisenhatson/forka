@@ -14,46 +14,65 @@ const ProfilePage = () => {
   const [userPosts, setUserPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('posts');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        // Find user by username
-        const response = await api.get('/users/', {
-          params: { search: username }
-        });
-        
-        if (response.data.length > 0) {
-          const user = response.data.find(u => u.username === username);
-          if (user) {
-            // Get detailed user info
-            const detailResponse = await api.get(`/users/${user.id}/`);
-            setProfileUser(detailResponse.data);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchUserPosts = async () => {
-      try {
-        const response = await api.get('/posts/', {
-          params: { author__username: username }
-        });
-        setUserPosts(response.data);
-      } catch (error) {
-        console.error('Error fetching user posts:', error);
-      }
-    };
-
     fetchUserProfile();
     fetchUserPosts();
-  }, [username]); // ✅ Add username to dependencies
+  }, [username]);
+
+  const fetchUserProfile = async () => {
+    try {
+      // ✅ Fix: Get all users and find by username
+      const response = await api.get('/users/');
+      const usersData = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.results || [];
+      
+      const user = usersData.find(u => u.username === username);
+      
+      if (user) {
+        // ✅ Get detailed user info
+        const detailResponse = await api.get(`/users/${user.id}/`);
+        setProfileUser(detailResponse.data);
+      } else {
+        setProfileUser(null);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setProfileUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserPosts = async () => {
+    try {
+      const response = await api.get('/posts/', {
+        params: { author__username: username }
+      });
+      
+      const postsData = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.results || [];
+      
+      setUserPosts(postsData);
+    } catch (error) {
+      console.error('Error fetching user posts:', error);
+      setUserPosts([]);
+    }
+  };
+
+  const handleProfileUpdate = (updatedUser) => {
+    setProfileUser(updatedUser);
+    if (isOwnProfile) {
+      // Update current user in auth store
+      const { updateUser } = useAuthStore.getState();
+      updateUser(updatedUser);
+    }
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -116,14 +135,28 @@ const ProfilePage = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
               {/* Profile Picture */}
               <div className="text-center mb-6">
-                <div className="w-32 h-32 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-5xl mx-auto mb-4">
-                  {profileUser.username?.charAt(0).toUpperCase()}
-                </div>
+                {profileUser.profile_picture ? (
+                  <img 
+                    src={profileUser.profile_picture} 
+                    alt={profileUser.username}
+                    className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
+                  />
+                ) : (
+                  <div className="w-32 h-32 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-5xl mx-auto mb-4">
+                    {profileUser.username?.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">
                   @{profileUser.username}
                 </h2>
                 {profileUser.role && (
-                  <span className="inline-block px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium">
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    profileUser.role === 'admin' 
+                      ? 'bg-red-100 text-red-700'
+                      : profileUser.role === 'moderator'
+                      ? 'bg-purple-100 text-purple-700'
+                      : 'bg-primary-100 text-primary-700'
+                  }`}>
                     {profileUser.role}
                   </span>
                 )}
@@ -155,7 +188,7 @@ const ProfilePage = () => {
 
               {/* Info */}
               <div className="space-y-3 mb-6">
-                {profileUser.email && (
+                {profileUser.date_joined && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Calendar className="w-4 h-4" />
                     <span>Joined {formatDate(profileUser.date_joined)}</span>
@@ -178,7 +211,10 @@ const ProfilePage = () => {
 
               {/* Edit Profile Button */}
               {isOwnProfile && (
-                <button className="w-full py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-medium flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => setShowEditModal(true)}
+                  className="w-full py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-medium flex items-center justify-center gap-2"
+                >
                   <Edit className="w-4 h-4" />
                   Edit Profile
                 </button>
@@ -277,6 +313,16 @@ const ProfilePage = () => {
           </main>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <EditProfileModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          currentUser={profileUser}
+          onUpdate={handleProfileUpdate}
+        />
+      )}
     </div>
   );
 };

@@ -232,15 +232,18 @@ REST_FRAMEWORK = {
 # CORS CONFIGURATION (Secure)
 # ============================================
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:5173',
-    cast=Csv()
-)
-
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# ✨ CORS Security Headers
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH', 
+    'POST',
+    'PUT',
+]
+
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
@@ -253,6 +256,14 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000", 
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
 
 # ============================================
 # JWT CONFIGURATION (Secure)
@@ -337,10 +348,6 @@ EMAIL_VERIFICATION_CODE_EXPIRY = 10  # minutes
 # ✨ Password reset
 PASSWORD_RESET_TIMEOUT = 3600  # 1 hour in seconds
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

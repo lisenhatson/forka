@@ -26,24 +26,29 @@ const ModeratorDashboard = () => {
   const fetchStats = async () => {
     try {
       const [postsRes, categoriesRes] = await Promise.all([
-        api.get('/posts/'),
-        api.get('/categories/'),
+        api.get('/posts/').catch(() => ({ data: [] })),
+        api.get('/categories/').catch(() => ({ data: [] })),
       ]);
 
       const postsData = Array.isArray(postsRes.data) 
         ? postsRes.data 
         : postsRes.data.results || [];
+      
+      const categoriesData = Array.isArray(categoriesRes.data) 
+        ? categoriesRes.data 
+        : categoriesRes.data.results || [];
 
       setStats({
         totalPosts: postsData.length,
         totalComments: postsData.reduce((acc, post) => acc + (post.comments_count || 0), 0),
-        totalCategories: categoriesRes.data.length,
+        totalCategories: categoriesData.length,
         pinnedPosts: postsData.filter(p => p.is_pinned).length,
         closedPosts: postsData.filter(p => p.is_closed).length,
         recentPosts: postsData.slice(0, 5),
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
+      toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }

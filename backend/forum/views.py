@@ -49,13 +49,28 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserDetailSerializer
         return UserSerializer
     
+    def get_serializer_context(self):
+        """Tambahkan request ke context serializer - ✅ NEW METHOD"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Override retrieve untuk pastikan context ada - ✅ UPDATED"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)  # Otomatis pakai context dari get_serializer_context
+        return Response(serializer.data)
+    
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
         """
         Get current user info
         GET /api/users/me/
         """
-        serializer = UserDetailSerializer(request.user)
+        serializer = UserDetailSerializer(
+            request.user, 
+            context={'request': request}  # ✅ PASS CONTEXT
+        )
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
@@ -65,7 +80,11 @@ class UserViewSet(viewsets.ModelViewSet):
         GET /api/users/my_posts/
         """
         posts = Post.objects.filter(author=request.user)
-        serializer = PostSerializer(posts, many=True)
+        serializer = PostSerializer(
+            posts, 
+            many=True, 
+            context={'request': request}  # ✅ PASS CONTEXT (jika PostSerializer butuh)
+        )
         return Response(serializer.data)
 
     @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
@@ -82,7 +101,12 @@ class UserViewSet(viewsets.ModelViewSet):
         }
         """
         user = request.user
-        serializer = UserDetailSerializer(user, data=request.data, partial=True)
+        serializer = UserDetailSerializer(
+            user, 
+            data=request.data, 
+            partial=True,
+            context={'request': request}  # ✅ PASS CONTEXT
+        )
         
         if serializer.is_valid():
             # Validate email if changed
