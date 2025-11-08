@@ -79,26 +79,43 @@ class UserDetailSerializer(serializers.ModelSerializer):
         return None
 
 
-# ✅ TAMBAHKAN: Serializer khusus untuk update profile
+# Serializer khusus untuk update profile
 class UserUpdateSerializer(serializers.ModelSerializer):
-    """Serializer untuk update user profile termasuk photo"""
-    
+    """Serializer untuk update user profile termasuk profile picture"""
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
         fields = ['bio', 'phone_number', 'profile_picture']
-    
+
     def update(self, instance, validated_data):
-        # ✅ Handle file upload
+        # Update text fields
         instance.bio = validated_data.get('bio', instance.bio)
         instance.phone_number = validated_data.get('phone_number', instance.phone_number)
-        
-        # ✅ Update profile picture jika ada
+
+        # Handle profile picture update
         if 'profile_picture' in validated_data:
-            # Hapus old image jika ada
-            if instance.profile_picture:
-                instance.profile_picture.delete(save=False)
-            instance.profile_picture = validated_data.get('profile_picture')
-        
+            profile_picture = validated_data.get('profile_picture')
+
+            if profile_picture:
+                # Delete old image if exists
+                if instance.profile_picture:
+                    try:
+                        instance.profile_picture.delete(save=False)
+                    except Exception as e:
+                        pass  # Old file might not exist
+
+                # Save new image
+                instance.profile_picture = profile_picture
+            elif profile_picture is None:
+                # Remove profile picture if None is passed
+                if instance.profile_picture:
+                    try:
+                        instance.profile_picture.delete(save=False)
+                    except Exception as e:
+                        pass
+                instance.profile_picture = None
+
         instance.save()
         return instance
 

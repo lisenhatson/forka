@@ -16,7 +16,8 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import User, Category, Post, Comment, Notification
 from .serializers import (
-    UserSerializer, UserDetailSerializer, UserRegistrationSerializer, 
+    UserSerializer, UserDetailSerializer, UserRegistrationSerializer,
+    UserUpdateSerializer,
     CategorySerializer,
     PostSerializer, PostCreateSerializer,
     CommentSerializer,
@@ -38,6 +39,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -66,33 +68,33 @@ class UserViewSet(viewsets.ModelViewSet):
         )
         return Response(serializer.data)
     
-    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['put', 'patch'], permission_classes=[IsAuthenticated], parser_classes=[MultiPartParser, FormParser, JSONParser])
     def update_profile(self, request):
-        """Update current user profile"""
+        """Update current user profile (including profile picture)"""
         user = request.user
-        serializer = UserDetailSerializer(
-            user, 
-            data=request.data, 
+
+        # Use UserUpdateSerializer for profile updates
+        serializer = UserUpdateSerializer(
+            user,
+            data=request.data,
             partial=True,
-            context={'request': request}  # ✅ PASS REQUEST
+            context={'request': request}
         )
-        
+
         if serializer.is_valid():
-            # Validate email if changed
-            new_email = request.data.get('email')
-            if new_email and new_email != user.email:
-                if User.objects.filter(email=new_email).exists():
-                    return Response(
-                        {'error': 'Email already exists'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            serializer.save()
+            updated_user = serializer.save()
+
+            # Return full user data using UserDetailSerializer
+            response_serializer = UserDetailSerializer(
+                updated_user,
+                context={'request': request}
+            )
+
             return Response({
                 'message': 'Profile updated successfully',
-                'user': serializer.data
+                'user': response_serializer.data
             })
-        
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
