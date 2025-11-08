@@ -1,3 +1,4 @@
+// frontend/src/pages/moderator/ModeratorDashboard.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
+import toast from 'react-hot-toast';
 
 const ModeratorDashboard = () => {
   const { user } = useAuthStore();
@@ -109,7 +111,7 @@ const ModeratorDashboard = () => {
             <div>
               <h3 className="font-semibold text-purple-900 mb-1">Moderator Access</h3>
               <p className="text-sm text-purple-700">
-                As a moderator, you can manage posts and comments, but cannot manage users or system settings.
+                As a moderator, you can manage posts and comments (pin, close, delete), but cannot manage users or system settings.
               </p>
             </div>
           </div>
@@ -122,7 +124,7 @@ const ModeratorDashboard = () => {
             value={stats.totalPosts}
             icon={<MessageSquare className="w-8 h-8" />}
             color="green"
-            link="/admin/posts"
+            link="/moderator/posts"
           />
           <StatCard
             title="Total Comments"
@@ -150,45 +152,49 @@ const ModeratorDashboard = () => {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Recent Posts</h2>
               <Link 
-                to="/admin/posts"
-                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                to="/moderator/posts"
+                className="text-purple-600 hover:text-purple-700 text-sm font-medium"
               >
                 Manage All
               </Link>
             </div>
-            <div className="space-y-3">
-              {stats.recentPosts.map((post) => (
-                <div key={post.id} className="p-3 hover:bg-gray-50 rounded-lg transition">
-                  <div className="flex items-start justify-between mb-2">
-                    <Link 
-                      to={`/posts/${post.id}`}
-                      className="font-medium text-gray-900 hover:text-primary-600 line-clamp-1 flex-1"
-                    >
-                      {post.title}
-                    </Link>
-                    <div className="flex items-center gap-2 ml-2">
-                      {post.is_pinned && (
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-                          Pinned
-                        </span>
-                      )}
-                      {post.is_closed && (
-                        <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">
-                          Closed
-                        </span>
-                      )}
+            {stats.recentPosts.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No posts yet</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.recentPosts.map((post) => (
+                  <div key={post.id} className="p-3 hover:bg-gray-50 rounded-lg transition">
+                    <div className="flex items-start justify-between mb-2">
+                      <Link 
+                        to={`/posts/${post.id}`}
+                        className="font-medium text-gray-900 hover:text-purple-600 line-clamp-1 flex-1"
+                      >
+                        {post.title}
+                      </Link>
+                      <div className="flex items-center gap-2 ml-2">
+                        {post.is_pinned && (
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                            Pinned
+                          </span>
+                        )}
+                        {post.is_closed && (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">
+                            Closed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <span>by @{post.author?.username}</span>
+                      <span>•</span>
+                      <span>{post.views_count} views</span>
+                      <span>•</span>
+                      <span>{post.comments_count} comments</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span>by @{post.author?.username}</span>
-                    <span>•</span>
-                    <span>{post.views_count} views</span>
-                    <span>•</span>
-                    <span>{post.comments_count} comments</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Moderation Actions */}
@@ -196,10 +202,10 @@ const ModeratorDashboard = () => {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
             <div className="space-y-3">
               <Link
-                to="/admin/posts"
-                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition"
+                to="/moderator/posts"
+                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition"
               >
-                <MessageSquare className="w-6 h-6 text-primary-600" />
+                <MessageSquare className="w-6 h-6 text-purple-600" />
                 <div>
                   <p className="font-medium text-gray-900">Manage Posts</p>
                   <p className="text-sm text-gray-500">Pin, close, or delete posts</p>
@@ -207,10 +213,10 @@ const ModeratorDashboard = () => {
               </Link>
 
               <Link
-                to="/admin/categories"
-                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition"
+                to="/home"
+                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition"
               >
-                <FolderOpen className="w-6 h-6 text-primary-600" />
+                <FolderOpen className="w-6 h-6 text-purple-600" />
                 <div>
                   <p className="font-medium text-gray-900">View Categories</p>
                   <p className="text-sm text-gray-500">Browse forum categories</p>
@@ -241,6 +247,7 @@ const ModeratorDashboard = () => {
                 <li>• Close resolved discussions</li>
                 <li>• Remove spam or inappropriate content</li>
                 <li>• Be fair and consistent</li>
+                <li>• Give warnings before deleting</li>
               </ul>
             </div>
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -250,6 +257,7 @@ const ModeratorDashboard = () => {
                 <li>• Abuse moderation powers</li>
                 <li>• Ignore community reports</li>
                 <li>• Make unilateral decisions on major issues</li>
+                <li>• Delete posts just because you disagree</li>
               </ul>
             </div>
           </div>

@@ -1,3 +1,4 @@
+// frontend/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ import AdminPosts from './pages/admin/AdminPosts';
 
 // Moderator Pages
 import ModeratorDashboard from './pages/moderator/ModeratorDashboard';
+import ModeratorPosts from './pages/moderator/ModeratorPosts';
 
 // Create QueryClient instance
 const queryClient = new QueryClient({
@@ -37,7 +39,7 @@ const ProtectedRoute = ({ children }) => {
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
-// ✨ BARU: Admin Route (only for admin/moderator)
+// ✨ Admin/Moderator Route (only for admin/moderator)
 const AdminRoute = ({ children }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -138,8 +140,8 @@ function App() {
             } 
           />
 
-          {/* ✨ BARU: Admin Routes (only for admin/moderator) */}
-           <Route 
+          {/* ✨ Admin Routes (only for admin) */}
+          <Route 
             path="/admin" 
             element={
               <AdminRoute>
@@ -160,6 +162,24 @@ function App() {
             element={
               <AdminRoute>
                 <AdminPosts />
+              </AdminRoute>
+            } 
+          />
+
+          {/* ✨ Moderator Routes (only for moderator) */}
+          <Route 
+            path="/moderator" 
+            element={
+              <AdminRoute>
+                <ModeratorDashboard />
+              </AdminRoute>
+            } 
+          />
+          <Route 
+            path="/moderator/posts" 
+            element={
+              <AdminRoute>
+                <ModeratorPosts />
               </AdminRoute>
             } 
           />
