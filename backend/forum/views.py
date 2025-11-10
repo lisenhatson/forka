@@ -6,12 +6,6 @@ from django.db.models import Q
 from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import User, Category, Post, Comment, Notification
@@ -46,7 +40,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserDetailSerializer
         return UserSerializer
     
-    # ✅ TAMBAHKAN METHOD INI (PENTING!)
     def get_serializer_context(self):
         """Pass request context to serializer"""
         context = super().get_serializer_context()
@@ -56,7 +49,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         """Override retrieve to ensure context"""
         instance = self.get_object()
-        serializer = self.get_serializer(instance)  # ✅ Auto use context
+        serializer = self.get_serializer(instance)
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
@@ -64,7 +57,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """Get current user info"""
         serializer = UserDetailSerializer(
             request.user, 
-            context={'request': request}  # ✅ PASS REQUEST
+            context={'request': request}
         )
         return Response(serializer.data)
     
@@ -73,7 +66,6 @@ class UserViewSet(viewsets.ModelViewSet):
         """Update current user profile (including profile picture)"""
         user = request.user
 
-        # Use UserUpdateSerializer for profile updates
         serializer = UserUpdateSerializer(
             user,
             data=request.data,
@@ -84,7 +76,6 @@ class UserViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             updated_user = serializer.save()
 
-            # Return full user data using UserDetailSerializer
             response_serializer = UserDetailSerializer(
                 updated_user,
                 context={'request': request}
@@ -99,23 +90,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def change_password(self, request):
-        """
-        Change user password
-        POST /api/users/change_password/
-        
-        Request body:
-        {
-            "old_password": "OldPass123!",
-            "new_password": "NewPass123!",
-            "new_password2": "NewPass123!"
-        }
-        """
+        """Change user password"""
         user = request.user
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
         new_password2 = request.data.get('new_password2')
         
-        # Validations
         if not old_password or not new_password or not new_password2:
             return Response(
                 {'error': 'All fields are required'},
@@ -134,7 +114,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validate password strength
         try:
             validate_password(new_password, user)
         except ValidationError as e:
@@ -143,7 +122,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Change password
         user.set_password(new_password)
         user.save()
         
@@ -159,8 +137,6 @@ class UserViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ModelViewSet):
     """
     API endpoint untuk Categories
-    GET /api/categories/ - List categories
-    POST /api/categories/ - Create (admin only)
     """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -174,28 +150,20 @@ class CategoryViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def posts(self, request, slug=None):
-        """
-        Get posts dari category ini
-        GET /api/categories/{slug}/posts/
-        """
+        """Get posts dari category ini"""
         category = self.get_object()
         posts = Post.objects.filter(category=category)
-        serializer = PostSerializer(posts, many=True)
+        serializer = PostSerializer(posts, many=True, context={'request': request})
         return Response(serializer.data)
 
 
 # ============================================
-# POST VIEWSET
+# POST VIEWSET (Updated untuk Image Upload)
 # ============================================
 
 class PostViewSet(viewsets.ModelViewSet):
     """
-    API endpoint untuk Posts
-    GET /api/posts/ - List posts
-    POST /api/posts/ - Create post
-    GET /api/posts/{id}/ - Post detail
-    PUT /api/posts/{id}/ - Update post
-    DELETE /api/posts/{id}/ - Delete post
+    API endpoint untuk Posts dengan image upload support
     """
     queryset = Post.objects.all().select_related('author', 'category').order_by('-created_at')
     serializer_class = PostSerializer
@@ -204,11 +172,20 @@ class PostViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'content']
     ordering_fields = ['created_at', 'views_count', 'likes']
     
+    # ✨ NEW: Add parsers untuk handle multipart/form-data (image upload)
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
     def get_serializer_class(self):
         """Pakai serializer berbeda untuk create"""
         if self.action == 'create':
             return PostCreateSerializer
         return PostSerializer
+    
+    def get_serializer_context(self):
+        """Pass request context untuk image URL"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
     
     def get_queryset(self):
         """Filter posts berdasarkan query params"""
@@ -227,7 +204,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        """Auto set author & generate slug"""
+        """Auto set author & generate slug, handle image"""
         title = serializer.validated_data.get('title')
         slug = slugify(title)
         
@@ -238,17 +215,18 @@ class PostViewSet(viewsets.ModelViewSet):
             slug = f"{original_slug}-{counter}"
             counter += 1
         
+        # ✨ Image akan di-handle otomatis dari validated_data
         serializer.save(author=self.request.user, slug=slug)
     
     def create(self, request, *args, **kwargs):
-        """Override create to return full post data"""
+        """Override create to return full post data dengan image URL"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         
         # Return full post data using PostSerializer
         post = Post.objects.get(id=serializer.instance.id)
-        output_serializer = PostSerializer(post)
+        output_serializer = PostSerializer(post, context={'request': request})
         headers = self.get_success_headers(output_serializer.data)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     
@@ -262,10 +240,7 @@ class PostViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
-        """
-        Like/Unlike post
-        POST /api/posts/{id}/like/
-        """
+        """Like/Unlike post"""
         post = self.get_object()
         
         if request.user in post.likes.all():
@@ -283,10 +258,7 @@ class PostViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsModeratorOrAdmin])
     def pin(self, request, pk=None):
-        """
-        Pin/Unpin post (moderator/admin only)
-        POST /api/posts/{id}/pin/
-        """
+        """Pin/Unpin post (moderator/admin only)"""
         post = self.get_object()
         post.is_pinned = not post.is_pinned
         post.save()
@@ -296,10 +268,7 @@ class PostViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsModeratorOrAdmin])
     def close(self, request, pk=None):
-        """
-        Close/Open post (moderator/admin only)
-        POST /api/posts/{id}/close/
-        """
+        """Close/Open post (moderator/admin only)"""
         post = self.get_object()
         post.is_closed = not post.is_closed
         post.save()
@@ -315,8 +284,6 @@ class PostViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     """
     API endpoint untuk Comments
-    GET /api/comments/ - List comments
-    POST /api/comments/ - Create comment
     """
     queryset = Comment.objects.all().select_related('author', 'post')
     serializer_class = CommentSerializer
@@ -326,12 +293,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         """Filter comments by post"""
         queryset = super().get_queryset()
         
-        # Filter by post
         post_id = self.request.query_params.get('post', None)
         if post_id:
             queryset = queryset.filter(post__id=post_id)
         
-        # Only top-level comments (no parent)
         if self.request.query_params.get('top_level', None):
             queryset = queryset.filter(parent__isnull=True)
         
@@ -343,10 +308,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
-        """
-        Like/Unlike comment
-        POST /api/comments/{id}/like/
-        """
+        """Like/Unlike comment"""
         comment = self.get_object()
         
         if request.user in comment.likes.all():
@@ -364,10 +326,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def replies(self, request, pk=None):
-        """
-        Get replies untuk comment ini
-        GET /api/comments/{id}/replies/
-        """
+        """Get replies untuk comment ini"""
         comment = self.get_object()
         replies = Comment.objects.filter(parent=comment)
         serializer = CommentSerializer(replies, many=True)
@@ -381,7 +340,6 @@ class CommentViewSet(viewsets.ModelViewSet):
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint untuk Notifications (read-only)
-    GET /api/notifications/ - List notifications
     """
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
@@ -392,10 +350,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
-        """
-        Mark notification as read
-        POST /api/notifications/{id}/mark_read/
-        """
+        """Mark notification as read"""
         notification = self.get_object()
         notification.is_read = True
         notification.save()
@@ -403,51 +358,6 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=False, methods=['post'])
     def mark_all_read(self, request):
-        """
-        Mark all notifications as read
-        POST /api/notifications/mark_all_read/
-        """
+        """Mark all notifications as read"""
         Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({'status': 'all marked as read'})
-
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def register_user(request):
-    """
-    Register new user
-    POST /api/register/
-    
-    Request body:
-    {
-        "username": "john_doe",
-        "email": "john@example.com",
-        "password": "StrongPass123!",
-        "password2": "StrongPass123!",
-        "bio": "Hello, I'm John" (optional)
-    }
-    """
-    serializer = UserRegistrationSerializer(data=request.data)
-    
-    if serializer.is_valid():
-        user = serializer.save()
-        
-        # Generate JWT token for auto-login after registration
-        from rest_framework_simplejwt.tokens import RefreshToken
-        refresh = RefreshToken.for_user(user)
-        
-        return Response({
-            'message': 'User registered successfully',
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'role': user.role,
-            },
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
-        }, status=status.HTTP_201_CREATED)
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

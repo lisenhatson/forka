@@ -1,3 +1,4 @@
+
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
@@ -99,12 +100,16 @@ class Category(models.Model):
         ordering = ['name']
 
 
+
 class Post(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     content = models.TextField()
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='posts')
+    
+    # ✨ NEW: Image field untuk post
+    image = models.ImageField(upload_to='posts/', null=True, blank=True)
     
     likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='liked_posts', blank=True)
     views_count = models.IntegerField(default=0)

@@ -1,15 +1,10 @@
-"""
-Django REST Framework Serializers untuk ForKa
-File: forum/serializers.py
-
-Version: Simple (nanti bisa di-expand)
-"""
+# backend/forum/serializers.py
+# ✅ UPDATE dengan image field
 
 from rest_framework import serializers
 from .models import User, Category, Post, Comment, Notification
 from django.core.exceptions import ValidationError
 from django.contrib.auth.password_validation import validate_password
-
 
 
 # ============================================
@@ -207,13 +202,13 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class PostSerializer(serializers.ModelSerializer):
     """
-    Serializer untuk Post
-    Dengan info author & counts
+    Serializer untuk Post dengan image support
     """
     author = UserSerializer(read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
     comments_count = serializers.IntegerField(read_only=True)
+    image = serializers.SerializerMethodField()
     
     class Meta:
         model = Post
@@ -225,6 +220,7 @@ class PostSerializer(serializers.ModelSerializer):
             'author',
             'category',
             'category_name',
+            'image',  # ✨ NEW
             'likes_count',
             'comments_count',
             'views_count',
@@ -243,17 +239,32 @@ class PostSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
+    
+    def get_image(self, obj):
+        """Return full URL untuk post image"""
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return f"http://localhost:8000{obj.image.url}"
+        return None
 
 
 class PostCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer khusus untuk create post
-    Lebih simple, ga perlu nested data
+    Serializer khusus untuk create post dengan image upload
     """
+    image = serializers.ImageField(required=False, allow_null=True)
+    
     class Meta:
         model = Post
-        fields = ['id', 'title', 'content', 'category']
+        fields = ['id', 'title', 'content', 'category', 'image']
         read_only_fields = ['id']
+    
+    def create(self, validated_data):
+        """Handle image upload saat create post"""
+        # Image akan di-handle otomatis oleh Django
+        return super().create(validated_data)
 
 
 # ============================================
