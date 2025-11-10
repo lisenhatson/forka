@@ -500,8 +500,8 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## 👥 Authors
 
-- **ASK1E** - *Initial work* - [YourGitHub](https://github.com/ASK1E)
-- **LisenHatson** - *Initial work* - [YourGitHub](https://github.com/lisenhatson)
+- **ASK1E** - *Initial work* - [ASK1E](https://github.com/ASK1E)
+- **LisenHatson** - *Initial work* - [LisenHatson](https://github.com/lisenhatson)
 
 ## 🙏 Acknowledgments
 
