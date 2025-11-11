@@ -4,6 +4,8 @@ import { ArrowLeft, ImagePlus, AlertCircle, X } from 'lucide-react';
 import useAuthStore from '/src/stores/authStore';
 import api from '/src/config/api';
 import toast from 'react-hot-toast';
+// ✅ 1. IMPORT KOMPONEN BARU
+import { ImagePreview } from 'src/components/ImageDisplay';
 
 const CreatePostPage = () => {
   const navigate = useNavigate();
@@ -16,7 +18,8 @@ const CreatePostPage = () => {
     category: ''
   });
   const [postImage, setPostImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  // ✅ 2. HAPUS STATE imagePreview
+  // const [imagePreview, setImagePreview] = useState(null); 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,14 +29,8 @@ const CreatePostPage = () => {
     loadDraft();
   }, []);
 
-  // ✅ Cleanup image preview on unmount
-  useEffect(() => {
-    return () => {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview);
-      }
-    };
-  }, [imagePreview]);
+  // ✅ 3. HAPUS useEffect untuk cleanup (tidak perlu lagi)
+  // useEffect(() => { ... }, [imagePreview]);
 
   const fetchCategories = async () => {
     try {
@@ -56,18 +53,16 @@ const CreatePostPage = () => {
     setError('');
   };
 
-  // ✨ Handle image selection
+  // ✅ 4. UPDATE handleImageChange
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast.error('Image size should be less than 10MB');
       return;
     }
 
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       toast.error('Please select a valid image file (JPG, PNG, GIF, WEBP)');
@@ -76,19 +71,14 @@ const CreatePostPage = () => {
 
     setPostImage(file);
     
-    // Create preview URL
-    const preview = URL.createObjectURL(file);
-    setImagePreview(preview);
+    // Hapus baris setImagePreview
     toast.success('Image selected!');
   };
 
-  // ✨ Remove image
+  // ✅ 5. UPDATE handleRemoveImage
   const handleRemoveImage = () => {
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
-    }
+    // Hapus logic revokeObjectURL
     setPostImage(null);
-    setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -106,7 +96,6 @@ const CreatePostPage = () => {
     setError('');
 
     try {
-      // ✅ Use FormData for multipart/form-data
       const formDataToSend = new FormData();
       formDataToSend.append('title', formData.title);
       formDataToSend.append('content', formData.content || '');
@@ -115,7 +104,6 @@ const CreatePostPage = () => {
         formDataToSend.append('category', formData.category);
       }
       
-      // ✅ Append image if selected
       if (postImage) {
         formDataToSend.append('image', postImage);
       }
@@ -123,9 +111,8 @@ const CreatePostPage = () => {
       const response = await api.post('/posts/', formDataToSend);
       
       toast.success('Post created successfully! 🎉');
-      localStorage.removeItem('post_draft'); // Clear draft
+      localStorage.removeItem('post_draft');
       
-      // Redirect to the created post
       navigate(`/posts/${response.data.id}`);
     } catch (error) {
       console.error('Error creating post:', error);
@@ -269,22 +256,13 @@ const CreatePostPage = () => {
                     Add image (optional)
                   </label>
                   
-                  {/* Image Preview */}
-                  {imagePreview ? (
-                    <div className="relative mb-4">
-                      <img 
-                        src={imagePreview} 
-                        alt="Preview" 
-                        className="w-full h-64 object-cover rounded-lg border-2 border-gray-300"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleRemoveImage}
-                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition shadow-lg"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
+                  {/* ✅ 6. GANTI LOGIC PREVIEW */}
+                  {postImage ? (
+                    <ImagePreview 
+                      file={postImage} 
+                      onRemove={handleRemoveImage} 
+                      className="h-64"
+                    />
                   ) : (
                     <div 
                       onClick={() => fileInputRef.current?.click()}

@@ -1,11 +1,11 @@
 // frontend/src/components/EditProfileModal.jsx
-// ✅ COMPLETE & TESTED VERSION
-
 import { useState, useRef, useEffect } from 'react';
 import { X, Camera, Upload, Loader2 } from 'lucide-react';
 import api from '../config/api';
 import toast from 'react-hot-toast';
 import useAuthStore from '../stores/authStore';
+// ✅ 1. IMPORT KOMPONEN BARU
+import { ProfileImage, ImagePreview } from 'src/components/ImageDisplay';
 
 const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
   const { updateUser } = useAuthStore();
@@ -14,34 +14,32 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
     phone_number: currentUser?.phone_number || '',
   });
   const [profileImage, setProfileImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(currentUser?.profile_picture || null);
+  // ✅ 2. HAPUS STATE imagePreview
+  // const [imagePreview, setImagePreview] = useState(currentUser?.profile_picture || null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // ✅ Reset form when modal opens with new user
   useEffect(() => {
     if (isOpen && currentUser) {
       setFormData({
         bio: currentUser.bio || '',
         phone_number: currentUser.phone_number || '',
       });
-      setImagePreview(currentUser.profile_picture || null);
+      // Hapus setImagePreview
       setProfileImage(null);
     }
   }, [isOpen, currentUser]);
 
-  // ✅ Handle image change with validation
+  // ✅ 3. UPDATE handleImageChange
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size should be less than 5MB');
       return;
     }
 
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       toast.error('Please select a valid image file (JPG, PNG, GIF, WEBP)');
@@ -49,45 +47,30 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
     }
 
     setProfileImage(file);
-    
-    // Create preview URL
-    const preview = URL.createObjectURL(file);
-    setImagePreview(preview);
+    // Hapus setImagePreview
   };
 
-  // ✅ Clean up preview URL on unmount
-  useEffect(() => {
-    return () => {
-      if (imagePreview && imagePreview.startsWith('blob:')) {
-        URL.revokeObjectURL(imagePreview);
-      }
-    };
-  }, [imagePreview]);
+  // ✅ 4. HAPUS useEffect cleanup
+  // useEffect(() => { ... }, [imagePreview]);
 
-  // ✅ Handle submit with FormData
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Create FormData for multipart/form-data
       const formDataToSend = new FormData();
       formDataToSend.append('bio', formData.bio || '');
       formDataToSend.append('phone_number', formData.phone_number || '');
       
-      // Only append image if new one is selected
       if (profileImage) {
         formDataToSend.append('profile_picture', profileImage);
       }
 
-      // Send PATCH request
       const response = await api.patch(
         '/users/update_profile/',
         formDataToSend
-        // Headers akan auto-set oleh axios interceptor
       );
 
-      // Update user in store & local state
       if (response.data.user) {
         updateUser(response.data.user);
         onUpdate(response.data.user);
@@ -106,16 +89,21 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
     }
   };
 
-  // ✅ Handle remove image
+  // ✅ 5. UPDATE handleRemoveImage
   const handleRemoveImage = () => {
     setProfileImage(null);
-    setImagePreview(null);
+    // Hapus setImagePreview
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   if (!isOpen) return null;
+
+  // ✅ 6. Buat variabel helper untuk UI
+  const hasExistingImage = !!currentUser?.profile_picture;
+  const hasNewImage = !!profileImage;
+  const hasImage = hasExistingImage || hasNewImage;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -134,29 +122,23 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
           {/* Profile Picture Upload */}
           <div className="flex flex-col items-center">
             <div className="relative">
-              <div className="w-32 h-32 rounded-full overflow-hidden bg-gray-200 border-4 border-white shadow-lg">
-                {imagePreview ? (
-                  <img 
-                    src={imagePreview} 
-                    alt="Profile Preview" 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      console.error('Image load error');
-                      e.target.style.display = 'none';
-                      // Show default avatar on error
-                      e.target.parentElement.innerHTML = `
-                        <div class="w-full h-full bg-primary-500 flex items-center justify-center text-white text-4xl font-bold">
-                          ${currentUser?.username?.charAt(0).toUpperCase()}
-                        </div>
-                      `;
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-primary-500 flex items-center justify-center text-white text-4xl font-bold">
-                    {currentUser?.username?.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
+              
+              {/* ✅ 7. GANTI LOGIC TAMPILAN GAMBAR */}
+              {hasNewImage ? (
+                // Jika ada file BARU, tampilkan preview
+                <ImagePreview 
+                  file={profileImage} 
+                  onRemove={handleRemoveImage}
+                  className="w-32 h-32 rounded-full"
+                />
+              ) : (
+                // Jika tidak, tampilkan gambar SAAT INI (atau fallback)
+                <ProfileImage
+                  src={currentUser?.profile_picture}
+                  username={currentUser?.username}
+                  size="2xl"
+                />
+              )}
               
               {/* Camera Button */}
               <button
@@ -179,16 +161,18 @@ const EditProfileModal = ({ isOpen, onClose, currentUser, onUpdate }) => {
             </div>
             
             <div className="mt-3 text-center">
+              {/* ✅ 8. UPDATE LOGIC TOMBOL */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                 disabled={loading}
               >
-                {imagePreview ? 'Change profile picture' : 'Upload profile picture'}
+                {hasImage ? 'Change profile picture' : 'Upload profile picture'}
               </button>
               
-              {imagePreview && (
+              {/* Tampilkan tombol Hapus hanya jika ada gambar (baru atau lama) */}
+              {hasImage && (
                 <button
                   type="button"
                   onClick={handleRemoveImage}

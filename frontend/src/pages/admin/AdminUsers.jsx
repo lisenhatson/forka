@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Search, Edit, Trash2, Shield, User, X } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
+// ✅ 1. IMPORT KOMPONEN BARU
+import { ProfileImage } from 'src/components/ImageDisplay';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -169,9 +171,14 @@ const AdminUsers = () => {
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
-                          {user.username?.charAt(0).toUpperCase()}
-                        </div>
+                        
+                        {/* ✅ 2. GANTI AVATAR USER */}
+                        <ProfileImage
+                          src={user.profile_picture}
+                          username={user.username}
+                          size="sm"
+                        />
+                        
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
                             {user.username}

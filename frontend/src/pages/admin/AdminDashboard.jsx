@@ -7,6 +7,8 @@ import {
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
+// ✅ 1. IMPORT KOMPONEN BARU
+import { ProfileImage } from 'src/components/ImageDisplay';
 
 const AdminDashboard = () => {
   const { user } = useAuthStore();
@@ -29,14 +31,12 @@ const AdminDashboard = () => {
     try {
       setError(null);
       
-      // ✅ Fetch data with proper error handling
       const [usersRes, postsRes, categoriesRes] = await Promise.all([
         api.get('/users/').catch(() => ({ data: [] })),
         api.get('/posts/').catch(() => ({ data: [] })),
         api.get('/categories/').catch(() => ({ data: [] })),
       ]);
 
-      // ✅ Handle both paginated and non-paginated responses
       const usersData = Array.isArray(usersRes.data) 
         ? usersRes.data 
         : usersRes.data.results || [];
@@ -172,9 +172,14 @@ const AdminDashboard = () => {
                 {stats.recentUsers.map((user) => (
                   <div key={user.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
-                        {user.username?.charAt(0).toUpperCase()}
-                      </div>
+                      
+                      {/* ✅ 2. GANTI AVATAR USER */}
+                      <ProfileImage
+                        src={user.profile_picture}
+                        username={user.username}
+                        size="sm"
+                      />
+                      
                       <div>
                         <p className="font-medium text-gray-900">{user.username}</p>
                         <p className="text-sm text-gray-500">{user.email}</p>

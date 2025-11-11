@@ -7,11 +7,13 @@ import {
   TrendingUp, 
   ThumbsUp, 
   Send, 
-  Edit,  // ✅ TAMBAH INI
-  Trash2  // ✅ TAMBAH INI
+  Edit,
+  Trash2
 } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
+// ✅ 1. IMPORT KOMPONEN BARU
+import { PostImage, ProfileImage } from 'src/components/ImageDisplay';
 
 
 const PostDetailPage = () => {
@@ -42,22 +44,21 @@ const PostDetailPage = () => {
   };
 
   const fetchComments = async () => {
-  try {
-    const response = await api.get('/comments/', {
-      params: { post: id, top_level: true }
-    });
-    
-    // ✅ Gunakan pattern yang sama
-    const commentsData = Array.isArray(response.data) 
-      ? response.data 
-      : response.data.results || [];
-    
-    setComments(commentsData);
-  } catch (error) {
-    console.error('Error fetching comments:', error);
-    setComments([]); // ✅ Set empty array on error
-  }
-};
+    try {
+      const response = await api.get('/comments/', {
+        params: { post: id, top_level: true }
+      });
+      
+      const commentsData = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.results || [];
+      
+      setComments(commentsData);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      setComments([]);
+    }
+  };
 
   const handleLikePost = async () => {
     try {
@@ -165,9 +166,15 @@ const PostDetailPage = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-6">
               {/* Author Info */}
               <div className="flex items-start gap-4 mb-6">
-                <div className="w-16 h-16 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-                  {post.author?.username?.charAt(0).toUpperCase()}
-                </div>
+                
+                {/* ✅ 2. GANTI AVATAR PENULIS */}
+                <ProfileImage
+                  src={post.author?.profile_picture}
+                  username={post.author?.username}
+                  size="lg"
+                  className="flex-shrink-0"
+                />
+
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <Link 
@@ -188,6 +195,13 @@ const PostDetailPage = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-4">
                 {post.title}
               </h1>
+
+              {/* ✅ 3. TAMBAHKAN GAMBAR POSTINGAN */}
+              <PostImage 
+                src={post.image} 
+                alt={post.title} 
+                className="my-6" 
+              />
 
               {/* Post Content */}
               <div className="prose max-w-none mb-6">
@@ -292,9 +306,15 @@ const PostDetailPage = () => {
           <aside className="hidden lg:block w-80 flex-shrink-0">
             <div className="sticky top-24 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="text-center mb-4">
-                <div className="w-24 h-24 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">
-                  {post.author?.username?.charAt(0).toUpperCase()}
-                </div>
+                
+                {/* ✅ 4. GANTI AVATAR SIDEBAR */}
+                <ProfileImage
+                  src={post.author?.profile_picture}
+                  username={post.author?.username}
+                  size="xl"
+                  className="mx-auto mb-4"
+                />
+
                 <h3 className="text-xl font-bold text-gray-900 mb-1">
                   @{post.author?.username}
                 </h3>
@@ -383,9 +403,14 @@ const CommentItem = ({ comment, postId }) => {
   return (
     <div className="border-l-2 border-gray-200 pl-4">
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
-          {comment.author?.username?.charAt(0).toUpperCase()}
-        </div>
+        
+        {/* ✅ 5. GANTI AVATAR KOMENTAR */}
+        <ProfileImage
+          src={comment.author?.profile_picture}
+          username={comment.author?.username}
+          size="sm"
+          className="flex-shrink-0"
+        />
         
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
@@ -456,9 +481,15 @@ const CommentItem = ({ comment, postId }) => {
             <div className="mt-4 space-y-4">
               {replies.map((reply) => (
                 <div key={reply.id} className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                    {reply.author?.username?.charAt(0).toUpperCase()}
-                  </div>
+                  
+                  {/* ✅ 6. GANTI AVATAR BALASAN */}
+                  <ProfileImage
+                    src={reply.author?.profile_picture}
+                    username={reply.author?.username}
+                    size="xs"
+                    className="flex-shrink-0"
+                  />
+                  
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium text-sm text-gray-900">@{reply.author?.username}</span>

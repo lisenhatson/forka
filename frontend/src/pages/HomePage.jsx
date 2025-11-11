@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Bell, Plus, Eye, MessageSquare, TrendingUp, ChevronDown, Menu } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
+// ✅ 1. IMPORT KOMPONEN BARU
+import { ProfileImage } from 'src/components/ImageDisplay';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -12,7 +14,7 @@ const HomePage = () => {
   const [filter, setFilter] = useState('new');
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false); // ✨ NEW
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -27,7 +29,6 @@ const HomePage = () => {
         }
       });
       
-      // ✅ Handle both paginated and non-paginated response
       const postsData = Array.isArray(response.data) 
         ? response.data 
         : response.data.results || [];
@@ -35,7 +36,7 @@ const HomePage = () => {
       setPosts(postsData);
     } catch (error) {
       console.error('Error fetching posts:', error);
-      setPosts([]); // ✅ Set empty array on error
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -61,13 +62,11 @@ const HomePage = () => {
     }
   };
 
-  // ✨ NEW: Show logout confirmation modal
   const handleLogout = () => {
     setShowLogoutModal(true);
     setShowUserMenu(false);
   };
 
-  // ✨ NEW: Confirm logout
   const confirmLogout = () => {
     logout();
     setShowLogoutModal(false);
@@ -141,9 +140,14 @@ const HomePage = () => {
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 p-1 hover:bg-gray-100 rounded-lg transition"
                 >
-                  <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
-                    {user?.username?.charAt(0).toUpperCase()}
-                  </div>
+                  
+                  {/* ✅ 2. GANTI AVATAR HEADER */}
+                  <ProfileImage
+                    src={user?.profile_picture}
+                    username={user?.username}
+                    size="sm"
+                  />
+
                   <ChevronDown className="w-4 h-4 text-gray-600" />
                 </button>
 
@@ -317,10 +321,13 @@ const HomePage = () => {
                     className="block bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition"
                   >
                     <div className="flex items-start gap-4">
-                      {/* Author Avatar */}
-                      <div className="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
-                        {post.author?.username?.charAt(0).toUpperCase()}
-                      </div>
+                      {/* ✅ 3. GANTI AVATAR PENULIS POST */}
+                      <ProfileImage
+                        src={post.author?.profile_picture}
+                        username={post.author?.username}
+                        size="md"
+                        className="flex-shrink-0"
+                      />
 
                       {/* Post Content */}
                       <div className="flex-1 min-w-0">
@@ -417,7 +424,7 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* ✨ NEW: Logout Confirmation Modal */}
+      {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm mx-4">

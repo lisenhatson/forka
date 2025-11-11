@@ -178,26 +178,26 @@ STATICFILES_DIRS = [
 
 
 # ============================================
-# MEDIA FILES
+# MEDIA FILES (UPDATED - Fixed for serving)
 # ============================================
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# ✨ File Upload Security
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+# ✅ File Upload Security
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB untuk posts
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 FILE_UPLOAD_PERMISSIONS = 0o644
 
+# ✅ IMPORTANT: Allowed image types
+ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 
-# ============================================
-# ✅ AUTO CREATE MEDIA FOLDERS
-# ============================================
-
+# ✅ AUTO CREATE MEDIA FOLDERS (Enhanced)
 def create_media_folders():
     """Automatically create media folders if they don't exist"""
     folders = [
         MEDIA_ROOT / 'profiles',
+        MEDIA_ROOT / 'posts',  # ✅ Tambahkan ini
         BASE_DIR / 'staticfiles',
         BASE_DIR / 'logs',
     ]
@@ -209,6 +209,18 @@ def create_media_folders():
 
 # Call on startup
 create_media_folders()
+
+# ✅ CORS Configuration untuk Media Files
+CORS_ALLOW_ALL_ORIGINS = True  # Hanya untuk development!
+CORS_ALLOW_CREDENTIALS = True
+
+# ✅ Expose headers untuk media files
+CORS_EXPOSE_HEADERS = [
+    'Content-Length',
+    'Content-Type',
+    'Content-Disposition',  # ✅ Tambahkan ini
+]
+
 
 
 # ============================================

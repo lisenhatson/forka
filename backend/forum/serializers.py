@@ -1,5 +1,5 @@
 # backend/forum/serializers.py
-# ✅ UPDATE dengan image field
+# ✅ COMPLETE FILE - Copy paste ini semua
 
 from rest_framework import serializers
 from .models import User, Category, Post, Comment, Notification
@@ -8,10 +8,11 @@ from django.contrib.auth.password_validation import validate_password
 
 
 # ============================================
-# USER SERIALIZER
+# USER SERIALIZERS
 # ============================================
 
 class UserSerializer(serializers.ModelSerializer):
+    """Basic User Serializer with Profile Picture"""
     profile_picture = serializers.SerializerMethodField()
     
     class Meta:
@@ -28,16 +29,20 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'date_joined']
     
     def get_profile_picture(self, obj):
-        """Return full URL untuk profile picture"""
+        """✅ Return full URL untuk profile picture"""
         if obj.profile_picture:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.profile_picture.url)
+                url = request.build_absolute_uri(obj.profile_picture.url)
+                print(f"✅ Profile Picture URL: {url}")  # Debug log
+                return url
+            # Fallback jika no request context
             return f"http://localhost:8000{obj.profile_picture.url}"
         return None
 
 
 class UserDetailSerializer(serializers.ModelSerializer):
+    """Detailed User Serializer"""
     posts_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()
@@ -65,7 +70,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
         return obj.comments.count()
     
     def get_profile_picture(self, obj):
-        """Return full URL untuk profile picture"""
+        """✅ Return full URL untuk profile picture"""
         if obj.profile_picture:
             request = self.context.get('request')
             if request:
@@ -74,21 +79,37 @@ class UserDetailSerializer(serializers.ModelSerializer):
         return None
 
 
-# Serializer khusus untuk update profile
 class UserUpdateSerializer(serializers.ModelSerializer):
-    """Serializer untuk update user profile termasuk profile picture"""
+    """Serializer untuk update user profile"""
     profile_picture = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = User
         fields = ['bio', 'phone_number', 'profile_picture']
 
+    def validate_profile_picture(self, value):
+        """Validate profile picture"""
+        if value:
+            # Check file size (max 5MB)
+            if value.size > 5 * 1024 * 1024:
+                raise serializers.ValidationError("Image size must be less than 5MB")
+            
+            # Check file extension
+            ext = value.name.split('.')[-1].lower()
+            allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+            if ext not in allowed:
+                raise serializers.ValidationError(
+                    f"Invalid image format. Allowed: {', '.join(allowed)}"
+                )
+        
+        return value
+
     def update(self, instance, validated_data):
-        # Update text fields
+        """Update user with image handling"""
         instance.bio = validated_data.get('bio', instance.bio)
         instance.phone_number = validated_data.get('phone_number', instance.phone_number)
 
-        # Handle profile picture update
+        # Handle profile picture
         if 'profile_picture' in validated_data:
             profile_picture = validated_data.get('profile_picture')
 
@@ -97,18 +118,21 @@ class UserUpdateSerializer(serializers.ModelSerializer):
                 if instance.profile_picture:
                     try:
                         instance.profile_picture.delete(save=False)
+                        print("✅ Old profile picture deleted")
                     except Exception as e:
-                        pass  # Old file might not exist
+                        print(f"⚠️ Error deleting old image: {e}")
 
-                # Save new image
                 instance.profile_picture = profile_picture
+                print(f"✅ New profile picture saved: {profile_picture.name}")
+                
             elif profile_picture is None:
-                # Remove profile picture if None is passed
+                # Remove profile picture
                 if instance.profile_picture:
                     try:
                         instance.profile_picture.delete(save=False)
+                        print("✅ Profile picture removed")
                     except Exception as e:
-                        pass
+                        print(f"⚠️ Error deleting image: {e}")
                 instance.profile_picture = None
 
         instance.save()
@@ -116,9 +140,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk User Registration
-    """
+    """Serializer untuk User Registration"""
     password = serializers.CharField(write_only=True, required=True)
     password2 = serializers.CharField(write_only=True, required=True, label="Confirm Password")
     
@@ -127,11 +149,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         fields = ['username', 'email', 'password', 'password2', 'bio']
     
     def validate(self, attrs):
-        """Validate password match"""
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Password fields didn't match."})
         
-        # Validate password strength
         try:
             validate_password(attrs['password'])
         except ValidationError as e:
@@ -140,19 +160,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
     
     def validate_email(self, value):
-        """Validate email unique"""
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists.")
         return value
     
     def validate_username(self, value):
-        """Validate username unique"""
         if User.objects.filter(username=value).exists():
             raise serializers.ValidationError("Username already exists.")
         return value
     
     def create(self, validated_data):
-        """Create new user"""
         validated_data.pop('password2')
         
         user = User.objects.create_user(
@@ -160,7 +177,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             email=validated_data.get('email', ''),
             password=validated_data['password'],
             bio=validated_data.get('bio', ''),
-            role='user'  # Default role
+            role='user'
         )
         
         return user
@@ -171,10 +188,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 # ============================================
 
 class CategorySerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk Category
-    Simple aja
-    """
+    """Serializer untuk Category"""
     posts_count = serializers.SerializerMethodField()
     
     class Meta:
@@ -192,18 +206,15 @@ class CategorySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
     
     def get_posts_count(self, obj):
-        """Hitung jumlah post di category ini"""
         return obj.posts.count()
 
 
 # ============================================
-# POST SERIALIZER
+# POST SERIALIZERS
 # ============================================
 
 class PostSerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk Post dengan image support
-    """
+    """Serializer untuk Post dengan image support"""
     author = UserSerializer(read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
@@ -220,7 +231,7 @@ class PostSerializer(serializers.ModelSerializer):
             'author',
             'category',
             'category_name',
-            'image',  # ✨ NEW
+            'image',
             'likes_count',
             'comments_count',
             'views_count',
@@ -241,19 +252,19 @@ class PostSerializer(serializers.ModelSerializer):
         ]
     
     def get_image(self, obj):
-        """Return full URL untuk post image"""
+        """✅ Return full URL untuk post image"""
         if obj.image:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.image.url)
+                url = request.build_absolute_uri(obj.image.url)
+                print(f"✅ Post Image URL: {url}")  # Debug log
+                return url
             return f"http://localhost:8000{obj.image.url}"
         return None
 
 
 class PostCreateSerializer(serializers.ModelSerializer):
-    """
-    Serializer khusus untuk create post dengan image upload
-    """
+    """Serializer khusus untuk create post dengan image upload"""
     image = serializers.ImageField(required=False, allow_null=True)
     
     class Meta:
@@ -261,9 +272,29 @@ class PostCreateSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'content', 'category', 'image']
         read_only_fields = ['id']
     
+    def validate_image(self, value):
+        """Validate image file"""
+        if value:
+            # Check file size (max 10MB)
+            if value.size > 10 * 1024 * 1024:
+                raise serializers.ValidationError("Image size must be less than 10MB")
+            
+            # Check file extension
+            ext = value.name.split('.')[-1].lower()
+            allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+            if ext not in allowed:
+                raise serializers.ValidationError(
+                    f"Invalid image format. Allowed: {', '.join(allowed)}"
+                )
+            
+            print(f"✅ Image validation passed: {value.name}")
+        
+        return value
+    
     def create(self, validated_data):
         """Handle image upload saat create post"""
-        # Image akan di-handle otomatis oleh Django
+        if 'image' in validated_data and validated_data['image']:
+            print(f"✅ Creating post with image: {validated_data['image'].name}")
         return super().create(validated_data)
 
 
@@ -272,10 +303,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
 # ============================================
 
 class CommentSerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk Comment
-    Dengan info author
-    """
+    """Serializer untuk Comment"""
     author = UserSerializer(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
     replies_count = serializers.SerializerMethodField()
@@ -302,7 +330,6 @@ class CommentSerializer(serializers.ModelSerializer):
         ]
     
     def get_replies_count(self, obj):
-        """Hitung jumlah replies"""
         return obj.replies.count() if hasattr(obj, 'replies') else 0
 
 
@@ -311,10 +338,7 @@ class CommentSerializer(serializers.ModelSerializer):
 # ============================================
 
 class NotificationSerializer(serializers.ModelSerializer):
-    """
-    Serializer untuk Notification
-    Simple dulu
-    """
+    """Serializer untuk Notification"""
     sender = UserSerializer(read_only=True)
     
     class Meta:

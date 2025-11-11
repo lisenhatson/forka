@@ -4,6 +4,7 @@ import { ArrowLeft, Github, Instagram, Facebook, Calendar, Edit } from 'lucide-r
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
 import EditProfileModal from 'src/components/EditProfileModal';
+import { ProfileImage } from 'src/components/ImageDisplay';
 
 const ProfilePage = () => {
   const { username } = useParams();
@@ -135,17 +136,15 @@ const ProfilePage = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
               {/* Profile Picture */}
               <div className="text-center mb-6">
-                {profileUser.profile_picture ? (
-                  <img 
-                    src={profileUser.profile_picture} 
-                    alt={profileUser.username}
-                    className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
-                  />
-                ) : (
-                  <div className="w-32 h-32 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-5xl mx-auto mb-4">
-                    {profileUser.username?.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                
+                {/* ✅ 2. GANTI AVATAR PROFIL */}
+                <ProfileImage
+                  src={profileUser.profile_picture}
+                  username={profileUser.username}
+                  size="2xl"
+                  className="mx-auto mb-4"
+                />
+
                 <h2 className="text-2xl font-bold text-gray-900 mb-1">
                   @{profileUser.username}
                 </h2>
