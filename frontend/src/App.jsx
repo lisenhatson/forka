@@ -8,6 +8,7 @@ import useAuthStore from './stores/authStore';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import HomePage from './pages/HomePage';
 import PostDetailPage from './pages/PostDetailPage';
 import CreatePostPage from './pages/CreatePostPage';
@@ -105,7 +106,14 @@ function App() {
               </GuestRoute>
             } 
           />
-
+          <Route 
+            path="/forgot-password" 
+            element={
+              <GuestRoute>
+                <ForgotPasswordPage />
+              </GuestRoute>
+            } 
+          />
           {/* Protected Routes (only for authenticated users) */}
           <Route 
             path="/home" 

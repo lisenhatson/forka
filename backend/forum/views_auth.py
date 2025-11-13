@@ -21,9 +21,10 @@ from django.db import transaction
 import bleach
 import logging
 
-from .models import User, EmailVerification
+from .models import User, EmailVerification, PasswordReset
 from .serializers import UserRegistrationSerializer, UserSerializer
-from .email_utils import send_verification_email
+from .email_utils import send_verification_email, send_password_reset_email
+
 
 logger = logging.getLogger(__name__)
 
@@ -393,4 +394,208 @@ def login_user(request):
         logger.error(f"Login error: {str(e)}")
         return Response({
             'error': 'Login failed'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # ✨ NEW: Forgot Password
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([VerifyEmailRateThrottle])  # Reuse same throttle
+def forgot_password(request):
+    """
+    Request password reset code
+    
+    Security:
+    - Rate limited (10/hour)
+    - Code expires in 15 minutes
+    - One-time use only
+    - Don't reveal if email exists
+    """
+    email = sanitize_input(request.data.get('email', ''))
+    
+    if not email:
+        return Response({
+            'error': 'Email is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Validate email format
+    if not validate_email_format(email):
+        return Response({
+            'error': 'Invalid email format'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(email=email)
+        
+        # Invalidate old reset codes
+        PasswordReset.objects.filter(
+            user=user,
+            is_used=False
+        ).update(is_used=True)
+        
+        # Generate new reset code
+        reset_code = PasswordReset.objects.create(user=user)
+        
+        if send_password_reset_email(user, reset_code.code):
+            logger.info(f"Password reset code sent to {email}")
+            return Response({
+                'message': 'If this email is registered, a reset code has been sent'
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'error': 'Failed to send reset code'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    except User.DoesNotExist:
+        # Don't reveal if email exists (security best practice)
+        logger.warning(f"Password reset requested for non-existent email: {email}")
+        return Response({
+            'message': 'If this email is registered, a reset code has been sent'
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Forgot password error: {str(e)}")
+        return Response({
+            'error': 'Failed to process request'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ✨ NEW: Verify Reset Code
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([VerifyEmailRateThrottle])
+def verify_reset_code(request):
+    """
+    Verify password reset code
+    
+    Returns a temporary token if code is valid
+    """
+    email = sanitize_input(request.data.get('email', ''))
+    code = sanitize_input(request.data.get('code', ''))
+    
+    if not email or not code:
+        return Response({
+            'error': 'Email and code are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(email=email)
+        
+        # Find valid reset code
+        reset_code = PasswordReset.objects.filter(
+            user=user,
+            code=code,
+            is_used=False
+        ).order_by('-created_at').first()
+        
+        if not reset_code:
+            return Response({
+                'error': 'Invalid reset code'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not reset_code.is_valid():
+            return Response({
+                'error': 'Reset code has expired'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Code is valid, return success (don't mark as used yet)
+        logger.info(f"Reset code verified for user: {user.username}")
+        
+        return Response({
+            'message': 'Code verified successfully',
+            'email': email,
+            'code': code  # Send back for reset password step
+        }, status=status.HTTP_200_OK)
+    
+    except User.DoesNotExist:
+        return Response({
+            'error': 'Invalid reset code'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Verify reset code error: {str(e)}")
+        return Response({
+            'error': 'Verification failed'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ✨ NEW: Reset Password
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([VerifyEmailRateThrottle])
+def reset_password(request):
+    """
+    Reset password with verified code
+    
+    Security:
+    - Requires valid reset code
+    - Strong password validation
+    - Code is marked as used after reset
+    """
+    email = sanitize_input(request.data.get('email', ''))
+    code = sanitize_input(request.data.get('code', ''))
+    new_password = request.data.get('new_password', '')
+    new_password2 = request.data.get('new_password2', '')
+    
+    if not email or not code or not new_password or not new_password2:
+        return Response({
+            'error': 'All fields are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if new_password != new_password2:
+        return Response({
+            'error': 'Passwords do not match'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(email=email)
+        
+        # Validate password strength
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response({
+                'error': list(e.messages)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Find valid reset code
+        reset_code = PasswordReset.objects.filter(
+            user=user,
+            code=code,
+            is_used=False
+        ).order_by('-created_at').first()
+        
+        if not reset_code:
+            return Response({
+                'error': 'Invalid or expired reset code'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not reset_code.is_valid():
+            return Response({
+                'error': 'Reset code has expired'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Reset password (atomic transaction)
+        with transaction.atomic():
+            user.set_password(new_password)
+            user.save()
+            
+            # Mark code as used
+            reset_code.is_used = True
+            reset_code.save()
+            
+            # Reset failed login attempts
+            user.reset_failed_login()
+        
+        logger.info(f"Password reset successful for user: {user.username}")
+        
+        return Response({
+            'message': 'Password reset successfully! You can now login with your new password.'
+        }, status=status.HTTP_200_OK)
+    
+    except User.DoesNotExist:
+        return Response({
+            'error': 'Invalid reset code'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Reset password error: {str(e)}")
+        return Response({
+            'error': 'Password reset failed'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

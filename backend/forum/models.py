@@ -1,4 +1,3 @@
-
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
@@ -35,6 +34,36 @@ class EmailVerification(models.Model):
     
     def __str__(self):
         return f"Code for {self.user.username} - {self.code}"
+
+
+# ✨ NEW: Password Reset Model
+class PasswordReset(models.Model):
+    """
+    Model untuk menyimpan kode reset password
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='password_resets')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    
+    class Meta:
+        verbose_name = 'Password Reset'
+        verbose_name_plural = 'Password Resets'
+        ordering = ['-created_at']
+    
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = ''.join(random.choices(string.digits, k=6))
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=15)  # 15 minutes
+        super().save(*args, **kwargs)
+    
+    def is_valid(self):
+        return not self.is_used and timezone.now() < self.expires_at
+    
+    def __str__(self):
+        return f"Reset code for {self.user.username} - {self.code}"
 
 
 # ✨ UPDATE User Model
@@ -100,7 +129,6 @@ class Category(models.Model):
         ordering = ['name']
 
 
-
 class Post(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
@@ -108,7 +136,6 @@ class Post(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='posts')
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='posts')
     
-    # ✨ NEW: Image field untuk post
     image = models.ImageField(upload_to='posts/', null=True, blank=True)
     
     likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='liked_posts', blank=True)

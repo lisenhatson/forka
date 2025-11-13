@@ -1,57 +1,92 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, CheckCircle, Mail, X } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, CheckCircle, X, Mail } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
 
+// --- 1. HELPER FUNCTIONS (Dipindah ke luar component agar rapi & performant) ---
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const censorEmail = (email) => {
+  if (!email) return '';
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return email;
+  return `${localPart.substring(0, 2)}***@${domain}`;
+};
+
+const calculatePasswordStrength = (password) => {
+  let score = 0;
+  const feedback = [];
+  
+  const checks = [
+    { regex: /.{8,}/, text: 'At least 8 characters' },
+    { regex: /[a-z]/, text: 'Contains lowercase letter' },
+    { regex: /[A-Z]/, text: 'Contains uppercase letter' },
+    { regex: /[0-9]/, text: 'Contains number' },
+    { regex: /[^a-zA-Z0-9]/, text: 'Contains special character' },
+  ];
+
+  checks.forEach(({ regex, text }) => {
+    const met = regex.test(password);
+    if (met) score++;
+    feedback.push({ text, met });
+  });
+
+  return { score, feedback };
+};
+
+const getStrengthColor = (score) => {
+  if (score <= 1) return 'bg-red-500';
+  if (score <= 2) return 'bg-orange-500';
+  if (score <= 3) return 'bg-yellow-500';
+  if (score <= 4) return 'bg-blue-500';
+  return 'bg-green-500';
+};
+
+const getStrengthText = (score) => {
+  const labels = ['Very Weak', 'Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  return labels[score] || 'Very Weak';
+};
+
+// --- COMPONENT UTAMA ---
 const RegisterPage = () => {
   const navigate = useNavigate();
+  
+  // Refs untuk input OTP
+  const otpRefs = useRef([]);
 
+  // States
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    password2: '',
-    bio: '',
+    username: '', email: '', password: '', password2: '', bio: '',
   });
+  
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: [] });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  
-  // ✨ NEW: Email Verification State
+
+  // OTP States
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendingOtp, setResendingOtp] = useState(false);
 
+  // --- HANDLERS ---
+
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    if (errors[e.target.name]) {
-      setErrors({
-        ...errors,
-        [e.target.name]: null,
-      });
-    }
-  };
-
- // ✨ Email validation function
-  const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // ✨ Email censoring function
-  const censorEmail = (email) => {
-    if (!email) return '';
-    const [localPart, domain] = email.split('@');
-    if (!localPart || !domain) return email;
+    const { name, value } = e.target;
     
-    // Show first 2 chars, then ***
-    const censored = localPart.substring(0, 2) + '***';
-    return `${censored}@${domain}`;
+    setFormData(prev => ({ ...prev, [name]: value }));
+
+    // Real-time Password Strength
+    if (name === 'password') {
+      setPasswordStrength(calculatePasswordStrength(value));
+    }
+    
+    // Clear error on type
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -61,18 +96,9 @@ const RegisterPage = () => {
 
     // Client-side validation
     const newErrors = {};
-    
-    // ✨ Email validation
-    if (!isValidEmail(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
-    
-    if (formData.password !== formData.password2) {
-      newErrors.password2 = "Passwords don't match";
-    }
-    if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
-    }
+    if (!isValidEmail(formData.email)) newErrors.email = "Please enter a valid email address";
+    if (formData.password !== formData.password2) newErrors.password2 = "Passwords don't match";
+    if (formData.password.length < 8) newErrors.password = "Password must be at least 8 characters";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -81,18 +107,9 @@ const RegisterPage = () => {
     }
 
     try {
-      // ✅ Register user - Backend akan kirim email OTP
-      const response = await api.post('/auth/register/', formData);
-      
-      // ✅ Show success message with email sensor
-      toast.success(
-        `Verification code sent to ${censorEmail(formData.email)}`,
-        { duration: 5000 }
-      );
-      
-      // ✅ Show OTP Modal
+      await api.post('/auth/register/', formData);
+      toast.success(`Verification code sent to ${censorEmail(formData.email)}`, { duration: 5000 });
       setShowOtpModal(true);
-      
     } catch (error) {
       console.error('Registration error:', error);
       setErrors(error.response?.data || { message: 'Registration failed' });
@@ -102,38 +119,30 @@ const RegisterPage = () => {
     }
   };
 
-  // ✨ Handle OTP Input Change
+  // --- OTP LOGIC (Cleaned) ---
+
   const handleOtpChange = (index, value) => {
-    // Only allow numbers
-    if (!/^\d*$/.test(value)) return;
+    if (!/^\d*$/.test(value)) return; // Only numbers
 
     const newOtp = [...otpCode];
     newOtp[index] = value;
     setOtpCode(newOtp);
 
-    // Auto-focus next input
+    // Auto-focus next input using REFS (bukan getElementById)
     if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      nextInput?.focus();
+      otpRefs.current[index + 1]?.focus();
     }
   };
 
-  // ✨ Handle OTP Backspace
   const handleOtpKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      prevInput?.focus();
+      otpRefs.current[index - 1]?.focus();
     }
   };
 
-  // ✨ Verify OTP
   const handleVerifyOtp = async () => {
     const code = otpCode.join('');
-    
-    if (code.length !== 6) {
-      toast.error('Please enter the complete 6-digit code');
-      return;
-    }
+    if (code.length !== 6) return toast.error('Please enter the complete 6-digit code');
 
     setVerifyingOtp(true);
     try {
@@ -142,102 +151,75 @@ const RegisterPage = () => {
         code: code
       });
 
-      // ✅ Verification successful
       toast.success('Email verified successfully! 🎉');
       
-      // ✅ Auto-login with tokens from backend
       if (response.data.tokens) {
         localStorage.setItem('access_token', response.data.tokens.access);
         localStorage.setItem('refresh_token', response.data.tokens.refresh);
         localStorage.setItem('user', JSON.stringify(response.data.user));
       }
       
-      // ✅ Redirect to home
-      setTimeout(() => {
-        navigate('/home');
-      }, 1000);
+      setTimeout(() => navigate('/home'), 1000);
       
     } catch (error) {
-      console.error('OTP verification error:', error);
       toast.error(error.response?.data?.error || 'Invalid or expired code');
     } finally {
       setVerifyingOtp(false);
     }
   };
 
-  // ✨ Resend OTP
   const handleResendOtp = async () => {
     setResendingOtp(true);
     try {
-      await api.post('/auth/resend-code/', {
-        email: formData.email
-      });
-      toast.success('New verification code sent to your email!');
-      setOtpCode(['', '', '', '', '', '']); // Clear OTP input
+      await api.post('/auth/resend-code/', { email: formData.email });
+      toast.success('New verification code sent!');
+      setOtpCode(['', '', '', '', '', '']); 
+      otpRefs.current[0]?.focus(); // Focus back to first input
     } catch (error) {
-      console.error('Resend OTP error:', error);
-      toast.error('Failed to resend code. Please try again.');
+      toast.error('Failed to resend code.');
     } finally {
       setResendingOtp(false);
     }
   };
 
+  // --- RENDER ---
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Image/Illustration */}
+      {/* Left Side - Illustration */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary-500 to-primary-700 items-center justify-center p-12">
         <div className="max-w-md text-white">
           <h1 className="text-4xl font-bold mb-6">Join ForKa Community</h1>
           <p className="text-lg text-primary-100 mb-8">
             Get more features and priviliges by joining to the most helpful community
           </p>
+          {/* Features List */}
           <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="w-6 h-6 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-semibold">Diskusi Terbuka</h3>
-                <p className="text-sm text-primary-100">Tanyakan apapun ke komunitas</p>
+            {[
+              { title: 'Diskusi Terbuka', desc: 'Tanyakan apapun ke komunitas' },
+              { title: 'Berbagi Pengetahuan', desc: 'Bantu sesama dengan jawabanmu' },
+              { title: 'Networking', desc: 'Terhubung dengan mahasiswa & dosen' }
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-start gap-3">
+                <CheckCircle className="w-6 h-6 flex-shrink-0 mt-1" />
+                <div>
+                  <h3 className="font-semibold">{item.title}</h3>
+                  <p className="text-sm text-primary-100">{item.desc}</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle className="w-6 h-6 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-semibold">Berbagi Pengetahuan</h3>
-                <p className="text-sm text-primary-100">Bantu sesama dengan jawabanmu</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle className="w-6 h-6 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-semibold">Networking</h3>
-                <p className="text-sm text-primary-100">Terhubung dengan mahasiswa & dosen</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Right Side - Register Form */}
+      {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
         <div className="w-full max-w-md">
-          {/* Logo & Title */}
           <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <img 
-                src="/polibatam-logo.png" 
-                alt="Polibatam Logo" 
-                className="h-12"
-                onError={(e) => e.target.style.display = 'none'}
-              />
-              <h1 className="text-3xl font-bold text-gray-800">ForKa</h1>
-            </div>
+            {/* Header Content */}
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">ForKa</h1>
             <h2 className="text-2xl font-semibold text-gray-800">Join ForKa Community</h2>
-            <p className="text-gray-600 mt-2">
-              Get more features and priviliges by joining to the most helpful community
-            </p>
           </div>
 
-          {/* General Error */}
           {errors.message && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
@@ -245,60 +227,47 @@ const RegisterPage = () => {
             </div>
           )}
 
-          {/* Register Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Username */}
+            {/* --- USERNAME --- */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Username
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
               <input
                 type="text"
                 name="username"
                 value={formData.username}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border ${errors.username ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition`}
+                className={`w-full px-4 py-3 border ${errors.username ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition`}
                 placeholder="user"
                 required
               />
-              {errors.username && (
-                <p className="text-sm text-red-600 mt-1">{errors.username}</p>
-              )}
+              {errors.username && <p className="text-sm text-red-600 mt-1">{errors.username}</p>}
             </div>
 
-            {/* Email */}
+            {/* --- EMAIL --- */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border ${errors.email ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition`}
+                className={`w-full px-4 py-3 border ${errors.email ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition`}
                 placeholder="user@gmail.com"
                 required
               />
-              {errors.email && (
-                <p className="text-sm text-red-600 mt-1">
-                  {Array.isArray(errors.email) ? errors.email[0] : errors.email}
-                </p>
-              )}
+              {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
             </div>
 
-            {/* Password */}
+            {/* --- PASSWORD --- */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full px-4 py-3 border ${errors.password ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition pr-12`}
+                  className={`w-full px-4 py-3 border ${errors.password ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition pr-12`}
                   placeholder="••••••••"
                   required
                 />
@@ -310,48 +279,77 @@ const RegisterPage = () => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-red-600 mt-1">
-                  {Array.isArray(errors.password) ? errors.password[0] : errors.password}
-                </p>
-              )}
+              {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
             </div>
 
-            {/* Repeat Password */}
+            {/* --- REPEAT PASSWORD --- */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Repeat password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Repeat password</label>
               <input
                 type={showPassword ? 'text' : 'password'}
                 name="password2"
                 value={formData.password2}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border ${errors.password2 ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition`}
+                className={`w-full px-4 py-3 border ${errors.password2 ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition`}
                 placeholder="••••••••"
                 required
               />
-              {errors.password2 && (
-                <p className="text-sm text-red-600 mt-1">{errors.password2}</p>
-              )}
+              {errors.password2 && <p className="text-sm text-red-600 mt-1">{errors.password2}</p>}
             </div>
 
-            {/* Bio (Optional) */}
+            {/* --- PASSWORD STRENGTH INDICATOR --- */}
+            {formData.password && (
+              <div className="mt-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Security Level</span>
+                  <span className={`text-xs font-bold uppercase ${
+                    passwordStrength.score <= 2 ? 'text-red-600' : 
+                    passwordStrength.score <= 3 ? 'text-yellow-600' : 
+                    'text-green-600'
+                  }`}>
+                    {getStrengthText(passwordStrength.score)}
+                  </span>
+                </div>
+                
+                {/* Bar */}
+                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-3">
+                  <div 
+                    className={`h-full transition-all duration-500 ease-out ${getStrengthColor(passwordStrength.score)}`}
+                    style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
+                  />
+                </div>
+                
+                {/* Checklist */}
+                <div className="grid grid-cols-1 gap-1">
+                  {passwordStrength.feedback.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 text-xs">
+                      {item.met ? (
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <div className="w-3 h-3 rounded-full border border-gray-300" />
+                      )}
+                      <span className={item.met ? 'text-gray-700 font-medium' : 'text-gray-400'}>
+                        {item.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* --- BIO --- */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bio (Optional)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Bio (Optional)</label>
               <textarea
                 name="bio"
                 value={formData.bio}
                 onChange={handleChange}
                 rows="2"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition resize-none"
                 placeholder="Tell us about yourself..."
               />
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -361,7 +359,6 @@ const RegisterPage = () => {
             </button>
           </form>
 
-          {/* Login Link */}
           <p className="mt-6 text-center text-gray-600">
             Already have an account?{' '}
             <Link to="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
@@ -369,7 +366,6 @@ const RegisterPage = () => {
             </Link>
           </p>
 
-          {/* Back to Home */}
           <div className="mt-8 text-center">
             <Link to="/" className="text-sm text-gray-500 hover:text-gray-700">
               ← Back to Home
@@ -378,60 +374,53 @@ const RegisterPage = () => {
         </div>
       </div>
 
-      {/* ✨ OTP Verification Modal */}
+      {/* --- OTP MODAL --- */}
       {showOtpModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative shadow-2xl">
             <button
               onClick={() => setShowOtpModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
             >
               <X className="w-6 h-6" />
             </button>
 
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Mail className="w-8 h-8 text-primary-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Verify Your Email
-              </h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Verify Email</h3>
               <p className="text-gray-600">
-                We've sent a 6-digit code to<br />
-                <span className="font-semibold text-gray-900">{formData.email}</span>
+                Code sent to <span className="font-semibold text-gray-900">{censorEmail(formData.email)}</span>
               </p>
             </div>
 
-            {/* OTP Input */}
             <div className="flex gap-2 justify-center mb-6">
               {otpCode.map((digit, index) => (
                 <input
                   key={index}
-                  id={`otp-${index}`}
-                  type="text"
+                  ref={(el) => (otpRefs.current[index] = el)}
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength="1"
                   value={digit}
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                  className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition"
+                  className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 outline-none transition"
                 />
               ))}
             </div>
 
-            {/* Verify Button */}
             <button
               onClick={handleVerifyOtp}
               disabled={verifyingOtp || otpCode.join('').length !== 6}
-              className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+              className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 mb-4"
             >
               {verifyingOtp ? 'Verifying...' : 'Verify Email'}
             </button>
 
-            {/* Resend OTP */}
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-2">
-                Didn't receive the code?
-              </p>
               <button
                 onClick={handleResendOtp}
                 disabled={resendingOtp}

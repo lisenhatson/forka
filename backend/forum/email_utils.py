@@ -1,8 +1,6 @@
 # backend/forum/email_utils.py
 from django.core.mail import send_mail
 from django.conf import settings
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
 import logging
 
 logger = logging.getLogger(__name__)
@@ -90,13 +88,14 @@ def send_verification_email(user, code):
         return False
 
 
-def send_password_reset_email(user, reset_link):
+# ✨ NEW: Password Reset Email
+def send_password_reset_email(user, code):
     """
-    Send password reset link to user's email
+    Send password reset code to user's email
     
-    Security: Link includes secure token and expires in 1 hour
+    Security: Code expires in 15 minutes
     """
-    subject = 'ForKa - Password Reset Request'
+    subject = 'ForKa - Password Reset Code'
     
     html_message = f"""
     <!DOCTYPE html>
@@ -105,27 +104,27 @@ def send_password_reset_email(user, reset_link):
         <style>
             body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
             .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-            .header {{ background-color: #0ea5e9; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }}
+            .header {{ background-color: #dc2626; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }}
             .content {{ background-color: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }}
-            .button {{ display: inline-block; background-color: #0ea5e9; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
-            .warning {{ color: #dc2626; font-size: 14px; margin-top: 20px; }}
+            .code-box {{ background-color: white; border: 2px solid #dc2626; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 10px; }}
+            .warning {{ color: #dc2626; font-size: 14px; margin-top: 20px; background-color: #fee2e2; padding: 15px; border-radius: 8px; }}
             .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>Password Reset Request</h1>
+                <h1>🔐 Password Reset Request</h1>
             </div>
             <div class="content">
                 <p>Hello <strong>{user.username}</strong>,</p>
                 <p>We received a request to reset your password for your ForKa account.</p>
-                <p>Click the button below to reset your password:</p>
-                <a href="{reset_link}" class="button">Reset Password</a>
-                <p>This link will expire in <strong>1 hour</strong>.</p>
+                <p>Your password reset code is:</p>
+                <div class="code-box">{code}</div>
+                <p>This code will expire in <strong>15 minutes</strong>.</p>
                 <p>If you didn't request a password reset, you can safely ignore this email.</p>
                 <div class="warning">
-                    ⚠️ <strong>Security Notice:</strong> Never share this link with anyone. If you didn't request this, your account may be at risk.
+                    <strong>⚠️ Security Alert:</strong> Never share this code with anyone. If you didn't request this reset, your account may be at risk. Please change your password immediately.
                 </div>
             </div>
             <div class="footer">
@@ -143,12 +142,13 @@ def send_password_reset_email(user, reset_link):
     
     We received a request to reset your password.
     
-    Click this link to reset your password:
-    {reset_link}
+    Your password reset code is: {code}
     
-    This link will expire in 1 hour.
+    This code will expire in 15 minutes.
     
     If you didn't request this, please ignore this email.
+    
+    Security Alert: If you didn't request this, your account may be at risk.
     
     © 2025 ForKa - Politeknik Negeri Batam
     """

@@ -13,7 +13,11 @@ from .views_auth import (
     verify_email,
     resend_verification_code,
     login_user,
+    forgot_password,
+    verify_reset_code,
+    reset_password,
 )
+
 
 # Router untuk automatic URL routing
 router = DefaultRouter()
@@ -29,6 +33,10 @@ urlpatterns = [
     path('auth/verify-email/', verify_email, name='verify_email'),
     path('auth/resend-code/', resend_verification_code, name='resend_code'),
     path('auth/login/', login_user, name='login'),
+    path('auth/forgot-password/', forgot_password, name='forgot_password'),
+    path('auth/verify-reset-code/', verify_reset_code, name='verify_reset_code'),
+    path('auth/reset-password/', reset_password, name='reset_password'),
+
     
     # Router URLs
     path('', include(router.urls)),
