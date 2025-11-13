@@ -1,12 +1,64 @@
 // frontend/src/pages/ForgotPasswordPage.jsx
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, AlertCircle, CheckCircle, X } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
 
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const censorEmail = (email) => {
+  if (!email) return '';
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return email;
+  return `${localPart.substring(0, 2)}***@${domain}`;
+};
+
+const calculatePasswordStrength = (password) => {
+  let score = 0;
+  const checks = [
+    { regex: /.{8,}/, text: 'At least 8 characters' },
+    { regex: /[a-z]/, text: 'Contains lowercase letter' },
+    { regex: /[A-Z]/, text: 'Contains uppercase letter' },
+    { regex: /[0-9]/, text: 'Contains number' },
+    { regex: /[^a-zA-Z0-9]/, text: 'Contains special character' },
+  ];
+
+  const feedback = checks.map(({ regex, text }) => {
+    const met = regex.test(password);
+    if (met) score++;
+    return { text, met };
+  });
+
+  return { score, feedback };
+};
+
+const getStrengthColor = (score) => {
+  if (score <= 1) return 'bg-red-500';
+  if (score <= 2) return 'bg-orange-500';
+  if (score <= 3) return 'bg-yellow-500';
+  if (score <= 4) return 'bg-blue-500';
+  return 'bg-green-500';
+};
+
+const getStrengthText = (score) => {
+  const labels = ['Very Weak', 'Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
+  return labels[score] || 'Very Weak';
+};
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
+  const otpRefs = useRef([]);
+  
+  // States
   const [step, setStep] = useState(1); // 1: Email, 2: OTP, 3: New Password
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
@@ -16,90 +68,42 @@ const ForgotPasswordPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: [] });
+
+  // ============================================
+  // STEP 1: REQUEST RESET CODE
+  // ============================================
   
-  // ✨ Password strength state
-  const [passwordStrength, setPasswordStrength] = useState({
-    score: 0,
-    feedback: []
-  });
-
-  // ✨ Password strength calculator
-  const calculatePasswordStrength = (password) => {
-    let score = 0;
-    const feedback = [];
-
-    if (password.length >= 8) {
-      score += 1;
-      feedback.push({ text: 'At least 8 characters', met: true });
-    } else {
-      feedback.push({ text: 'At least 8 characters', met: false });
-    }
-
-    if (/[a-z]/.test(password)) {
-      score += 1;
-      feedback.push({ text: 'Contains lowercase letter', met: true });
-    } else {
-      feedback.push({ text: 'Contains lowercase letter', met: false });
-    }
-
-    if (/[A-Z]/.test(password)) {
-      score += 1;
-      feedback.push({ text: 'Contains uppercase letter', met: true });
-    } else {
-      feedback.push({ text: 'Contains uppercase letter', met: false });
-    }
-
-    if (/[0-9]/.test(password)) {
-      score += 1;
-      feedback.push({ text: 'Contains number', met: true });
-    } else {
-      feedback.push({ text: 'Contains number', met: false });
-    }
-
-    if (/[^a-zA-Z0-9]/.test(password)) {
-      score += 1;
-      feedback.push({ text: 'Contains special character', met: true });
-    } else {
-      feedback.push({ text: 'Contains special character', met: false });
-    }
-
-    return { score, feedback };
-  };
-
-  const getStrengthColor = (score) => {
-    if (score <= 1) return 'bg-red-500';
-    if (score <= 2) return 'bg-orange-500';
-    if (score <= 3) return 'bg-yellow-500';
-    if (score <= 4) return 'bg-blue-500';
-    return 'bg-green-500';
-  };
-
-  const getStrengthText = (score) => {
-    if (score <= 1) return 'Very Weak';
-    if (score <= 2) return 'Weak';
-    if (score <= 3) return 'Fair';
-    if (score <= 4) return 'Good';
-    return 'Strong';
-  };
-
-  // Step 1: Request reset code
   const handleRequestCode = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!isValidEmail(email)) {
+      setError('Invalid email format');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/forgot-password/', { email });
+      await api.post('/auth/forgot-password/', { email });
       toast.success('Reset code sent to your email!');
       setStep(2);
+      // Auto-focus first OTP input
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (error) {
+      console.error('❌ Forgot password error:', error);
       setError(error.response?.data?.error || 'Failed to send reset code');
+      toast.error('Failed to send reset code');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✨ OTP Input handlers (dengan masking)
+  // ============================================
+  // OTP HANDLERS
+  // ============================================
+
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
 
@@ -108,19 +112,20 @@ const ForgotPasswordPage = () => {
     setOtpCode(newOtp);
 
     if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      nextInput?.focus();
+      otpRefs.current[index + 1]?.focus();
     }
   };
 
   const handleOtpKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      prevInput?.focus();
+      otpRefs.current[index - 1]?.focus();
     }
   };
 
-  // Step 2: Verify code
+  // ============================================
+  // STEP 2: VERIFY CODE
+  // ============================================
+
   const handleVerifyCode = async () => {
     const code = otpCode.join('');
     
@@ -137,17 +142,23 @@ const ForgotPasswordPage = () => {
       toast.success('Code verified! Enter your new password.');
       setStep(3);
     } catch (error) {
+      console.error('❌ Verify code error:', error);
       setError(error.response?.data?.error || 'Invalid or expired code');
+      toast.error('Invalid or expired code');
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 3: Reset password
+  // ============================================
+  // STEP 3: RESET PASSWORD
+  // ============================================
+
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setError('');
 
+    // Validation
     if (passwords.new_password !== passwords.new_password2) {
       setError('Passwords do not match');
       return;
@@ -171,8 +182,14 @@ const ForgotPasswordPage = () => {
       
       toast.success('Password reset successfully! 🎉');
       setTimeout(() => navigate('/login'), 2000);
+      
     } catch (error) {
-      setError(error.response?.data?.error || 'Failed to reset password');
+      console.error('❌ Reset password error:', error);
+      const errorMsg = error.response?.data?.error || 
+                       error.response?.data?.new_password?.[0] || 
+                       'Failed to reset password';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -187,6 +204,24 @@ const ForgotPasswordPage = () => {
       setPasswordStrength(strength);
     }
   };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    try {
+      await api.post('/auth/forgot-password/', { email });
+      toast.success('New code sent!');
+      setOtpCode(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+    } catch (error) {
+      toast.error('Failed to resend code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============================================
+  // RENDER
+  // ============================================
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-100 p-4">
@@ -214,7 +249,7 @@ const ForgotPasswordPage = () => {
             </h1>
             <p className="text-gray-600">
               {step === 1 && 'Enter your email to receive a reset code'}
-              {step === 2 && `We sent a code to ${email}`}
+              {step === 2 && `We sent a code to ${censorEmail(email)}`}
               {step === 3 && 'Choose a strong password'}
             </p>
           </div>
@@ -227,9 +262,11 @@ const ForgotPasswordPage = () => {
             </div>
           )}
 
-          {/* Step 1: Email */}
+          {/* ============================================ */}
+          {/* STEP 1: EMAIL INPUT */}
+          {/* ============================================ */}
           {step === 1 && (
-            <div className="space-y-6">
+            <form onSubmit={handleRequestCode} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
@@ -240,29 +277,32 @@ const ForgotPasswordPage = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition"
+                  required
                 />
               </div>
 
               <button
-                onClick={handleRequestCode}
+                type="submit"
                 disabled={loading || !email}
                 className="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Sending...' : 'Send Reset Code'}
               </button>
-            </div>
+            </form>
           )}
 
-          {/* Step 2: OTP (dengan masking ******) */}
+          {/* ============================================ */}
+          {/* STEP 2: OTP INPUT */}
+          {/* ============================================ */}
           {step === 2 && (
             <div className="space-y-6">
-              {/* ✨ OTP Input dengan masking */}
               <div className="flex gap-2 justify-center">
                 {otpCode.map((digit, index) => (
                   <input
                     key={index}
-                    id={`otp-${index}`}
+                    ref={(el) => (otpRefs.current[index] = el)}
                     type="password"
+                    inputMode="numeric"
                     maxLength="1"
                     value={digit}
                     onChange={(e) => handleOtpChange(index, e.target.value)}
@@ -281,7 +321,7 @@ const ForgotPasswordPage = () => {
               </button>
 
               <button
-                onClick={() => handleRequestCode({ preventDefault: () => {} })}
+                onClick={handleResendCode}
                 disabled={loading}
                 className="w-full text-red-600 hover:text-red-700 font-medium text-sm"
               >
@@ -290,9 +330,11 @@ const ForgotPasswordPage = () => {
             </div>
           )}
 
-          {/* Step 3: New Password dengan Strength Meter */}
+          {/* ============================================ */}
+          {/* STEP 3: NEW PASSWORD */}
+          {/* ============================================ */}
           {step === 3 && (
-            <div className="space-y-6">
+            <form onSubmit={handleResetPassword} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   New Password
@@ -304,9 +346,10 @@ const ForgotPasswordPage = () => {
                   onChange={handlePasswordChange}
                   placeholder="Enter new password"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition"
+                  required
                 />
                 
-                {/* ✨ Password Strength Meter */}
+                {/* Password Strength Meter */}
                 {passwords.new_password && (
                   <div className="mt-3">
                     <div className="flex items-center justify-between mb-2">
@@ -320,7 +363,6 @@ const ForgotPasswordPage = () => {
                       </span>
                     </div>
                     
-                    {/* Strength Bar */}
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div 
                         className={`h-full transition-all duration-300 ${getStrengthColor(passwordStrength.score)}`}
@@ -328,7 +370,6 @@ const ForgotPasswordPage = () => {
                       />
                     </div>
                     
-                    {/* Requirements Checklist */}
                     <div className="mt-3 space-y-1">
                       {passwordStrength.feedback.map((item, index) => (
                         <div key={index} className="flex items-center gap-2 text-sm">
@@ -358,17 +399,18 @@ const ForgotPasswordPage = () => {
                   onChange={handlePasswordChange}
                   placeholder="Confirm new password"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition"
+                  required
                 />
               </div>
 
               <button
-                onClick={handleResetPassword}
+                type="submit"
                 disabled={loading || passwordStrength.score < 3}
                 className="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Resetting...' : 'Reset Password'}
               </button>
-            </div>
+            </form>
           )}
 
           {/* Progress Indicator */}

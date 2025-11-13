@@ -1,10 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+// frontend/src/pages/RegisterPage.jsx
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, CheckCircle, X, Mail } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
+import useAuthStore from 'src/stores/authStore';
 
-// --- 1. HELPER FUNCTIONS (Dipindah ke luar component agar rapi & performant) ---
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const censorEmail = (email) => {
@@ -16,8 +21,6 @@ const censorEmail = (email) => {
 
 const calculatePasswordStrength = (password) => {
   let score = 0;
-  const feedback = [];
-  
   const checks = [
     { regex: /.{8,}/, text: 'At least 8 characters' },
     { regex: /[a-z]/, text: 'Contains lowercase letter' },
@@ -26,10 +29,10 @@ const calculatePasswordStrength = (password) => {
     { regex: /[^a-zA-Z0-9]/, text: 'Contains special character' },
   ];
 
-  checks.forEach(({ regex, text }) => {
+  const feedback = checks.map(({ regex, text }) => {
     const met = regex.test(password);
     if (met) score++;
-    feedback.push({ text, met });
+    return { text, met };
   });
 
   return { score, feedback };
@@ -48,14 +51,18 @@ const getStrengthText = (score) => {
   return labels[score] || 'Very Weak';
 };
 
-// --- COMPONENT UTAMA ---
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const { setAuth } = useAuthStore(); // ✅ Ambil setAuth dari store
   
-  // Refs untuk input OTP
+  // Refs untuk OTP input
   const otpRefs = useRef([]);
 
-  // States
+  // Form States
   const [formData, setFormData] = useState({
     username: '', email: '', password: '', password2: '', bio: '',
   });
@@ -71,7 +78,9 @@ const RegisterPage = () => {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendingOtp, setResendingOtp] = useState(false);
 
-  // --- HANDLERS ---
+  // ============================================
+  // HANDLERS
+  // ============================================
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -83,22 +92,29 @@ const RegisterPage = () => {
       setPasswordStrength(calculatePasswordStrength(value));
     }
     
-    // Clear error on type
+    // Clear error
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
   };
 
+  // ✅ SUBMIT REGISTER
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
     setIsLoading(true);
 
-    // Client-side validation
+    // Validation
     const newErrors = {};
-    if (!isValidEmail(formData.email)) newErrors.email = "Please enter a valid email address";
-    if (formData.password !== formData.password2) newErrors.password2 = "Passwords don't match";
-    if (formData.password.length < 8) newErrors.password = "Password must be at least 8 characters";
+    if (!isValidEmail(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+    if (formData.password !== formData.password2) {
+      newErrors.password2 = "Passwords don't match";
+    }
+    if (formData.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -107,28 +123,47 @@ const RegisterPage = () => {
     }
 
     try {
-      await api.post('/auth/register/', formData);
-      toast.success(`Verification code sent to ${censorEmail(formData.email)}`, { duration: 5000 });
+      const response = await api.post('/auth/register/', formData);
+      
+      console.log('✅ Register response:', response.data);
+      
+      toast.success(`Verification code sent to ${censorEmail(formData.email)}`, { 
+        duration: 5000 
+      });
+      
       setShowOtpModal(true);
+      
     } catch (error) {
-      console.error('Registration error:', error);
-      setErrors(error.response?.data || { message: 'Registration failed' });
-      toast.error('Registration failed. Please try again.');
+      console.error('❌ Registration error:', error.response?.data);
+      const serverErrors = error.response?.data || {};
+      
+      // Handle different error formats
+      if (typeof serverErrors.error === 'string') {
+        setErrors({ message: serverErrors.error });
+      } else if (serverErrors.username || serverErrors.email || serverErrors.password) {
+        setErrors(serverErrors);
+      } else {
+        setErrors({ message: 'Registration failed. Please try again.' });
+      }
+      
+      toast.error('Registration failed. Please check your input.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- OTP LOGIC (Cleaned) ---
+  // ============================================
+  // OTP HANDLERS
+  // ============================================
 
   const handleOtpChange = (index, value) => {
-    if (!/^\d*$/.test(value)) return; // Only numbers
+    if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otpCode];
     newOtp[index] = value;
     setOtpCode(newOtp);
 
-    // Auto-focus next input using REFS (bukan getElementById)
+    // Auto-focus next
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
@@ -140,49 +175,63 @@ const RegisterPage = () => {
     }
   };
 
+  // ✅ VERIFY OTP - FIX AUTH FLOW
   const handleVerifyOtp = async () => {
     const code = otpCode.join('');
-    if (code.length !== 6) return toast.error('Please enter the complete 6-digit code');
+    
+    if (code.length !== 6) {
+      toast.error('Please enter the complete 6-digit code');
+      return;
+    }
 
     setVerifyingOtp(true);
+    
     try {
       const response = await api.post('/auth/verify-email/', {
         email: formData.email,
         code: code
       });
 
-      toast.success('Email verified successfully! 🎉');
-      
-      if (response.data.tokens) {
-        localStorage.setItem('access_token', response.data.tokens.access);
-        localStorage.setItem('refresh_token', response.data.tokens.refresh);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      console.log('✅ Verify response:', response.data);
+
+      // ✅ CRITICAL FIX: Set auth properly
+      if (response.data.tokens && response.data.user) {
+        setAuth(response.data.user, response.data.tokens);
+        toast.success('Email verified successfully! 🎉');
+        setTimeout(() => navigate('/home'), 1000);
+      } else {
+        throw new Error('Invalid response format');
       }
       
-      setTimeout(() => navigate('/home'), 1000);
-      
     } catch (error) {
+      console.error('❌ Verify error:', error.response?.data);
       toast.error(error.response?.data?.error || 'Invalid or expired code');
     } finally {
       setVerifyingOtp(false);
     }
   };
 
+  // ✅ RESEND OTP
   const handleResendOtp = async () => {
     setResendingOtp(true);
+    
     try {
       await api.post('/auth/resend-code/', { email: formData.email });
       toast.success('New verification code sent!');
-      setOtpCode(['', '', '', '', '', '']); 
-      otpRefs.current[0]?.focus(); // Focus back to first input
+      setOtpCode(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
     } catch (error) {
+      console.error('❌ Resend error:', error);
       toast.error('Failed to resend code.');
     } finally {
       setResendingOtp(false);
     }
   };
 
-  // --- RENDER ---
+  // ============================================
+  // RENDER
+  // ============================================
+
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Illustration */}
@@ -190,9 +239,8 @@ const RegisterPage = () => {
         <div className="max-w-md text-white">
           <h1 className="text-4xl font-bold mb-6">Join ForKa Community</h1>
           <p className="text-lg text-primary-100 mb-8">
-            Get more features and priviliges by joining to the most helpful community
+            Get more features and privileges by joining the most helpful community
           </p>
-          {/* Features List */}
           <div className="space-y-4">
             {[
               { title: 'Diskusi Terbuka', desc: 'Tanyakan apapun ke komunitas' },
@@ -214,12 +262,13 @@ const RegisterPage = () => {
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50">
         <div className="w-full max-w-md">
+          {/* Header */}
           <div className="text-center mb-8">
-            {/* Header Content */}
             <h1 className="text-3xl font-bold text-gray-800 mb-2">ForKa</h1>
             <h2 className="text-2xl font-semibold text-gray-800">Join ForKa Community</h2>
           </div>
 
+          {/* Error Alert */}
           {errors.message && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
@@ -227,8 +276,9 @@ const RegisterPage = () => {
             </div>
           )}
 
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* --- USERNAME --- */}
+            {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
               <input
@@ -237,13 +287,13 @@ const RegisterPage = () => {
                 value={formData.username}
                 onChange={handleChange}
                 className={`w-full px-4 py-3 border ${errors.username ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition`}
-                placeholder="user"
+                placeholder="johndoe"
                 required
               />
               {errors.username && <p className="text-sm text-red-600 mt-1">{errors.username}</p>}
             </div>
 
-            {/* --- EMAIL --- */}
+            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
@@ -252,13 +302,13 @@ const RegisterPage = () => {
                 value={formData.email}
                 onChange={handleChange}
                 className={`w-full px-4 py-3 border ${errors.email ? 'border-red-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition`}
-                placeholder="user@gmail.com"
+                placeholder="john@example.com"
                 required
               />
               {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
             </div>
 
-            {/* --- PASSWORD --- */}
+            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
               <div className="relative">
@@ -282,7 +332,7 @@ const RegisterPage = () => {
               {errors.password && <p className="text-sm text-red-600 mt-1">{errors.password}</p>}
             </div>
 
-            {/* --- REPEAT PASSWORD --- */}
+            {/* Repeat Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Repeat password</label>
               <input
@@ -297,9 +347,9 @@ const RegisterPage = () => {
               {errors.password2 && <p className="text-sm text-red-600 mt-1">{errors.password2}</p>}
             </div>
 
-            {/* --- PASSWORD STRENGTH INDICATOR --- */}
+            {/* Password Strength */}
             {formData.password && (
-              <div className="mt-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Security Level</span>
                   <span className={`text-xs font-bold uppercase ${
@@ -311,15 +361,13 @@ const RegisterPage = () => {
                   </span>
                 </div>
                 
-                {/* Bar */}
                 <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-3">
                   <div 
-                    className={`h-full transition-all duration-500 ease-out ${getStrengthColor(passwordStrength.score)}`}
+                    className={`h-full transition-all duration-500 ${getStrengthColor(passwordStrength.score)}`}
                     style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
                   />
                 </div>
                 
-                {/* Checklist */}
                 <div className="grid grid-cols-1 gap-1">
                   {passwordStrength.feedback.map((item, index) => (
                     <div key={index} className="flex items-center gap-2 text-xs">
@@ -337,7 +385,7 @@ const RegisterPage = () => {
               </div>
             )}
 
-            {/* --- BIO --- */}
+            {/* Bio */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Bio (Optional)</label>
               <textarea
@@ -350,6 +398,7 @@ const RegisterPage = () => {
               />
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -359,6 +408,7 @@ const RegisterPage = () => {
             </button>
           </form>
 
+          {/* Login Link */}
           <p className="mt-6 text-center text-gray-600">
             Already have an account?{' '}
             <Link to="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
@@ -366,6 +416,7 @@ const RegisterPage = () => {
             </Link>
           </p>
 
+          {/* Back to Home */}
           <div className="mt-8 text-center">
             <Link to="/" className="text-sm text-gray-500 hover:text-gray-700">
               ← Back to Home
@@ -374,7 +425,9 @@ const RegisterPage = () => {
         </div>
       </div>
 
-      {/* --- OTP MODAL --- */}
+      {/* ============================================ */}
+      {/* OTP MODAL */}
+      {/* ============================================ */}
       {showOtpModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-2xl p-8 w-full max-w-md relative shadow-2xl">
@@ -395,6 +448,7 @@ const RegisterPage = () => {
               </p>
             </div>
 
+            {/* OTP Inputs */}
             <div className="flex gap-2 justify-center mb-6">
               {otpCode.map((digit, index) => (
                 <input
@@ -412,6 +466,7 @@ const RegisterPage = () => {
               ))}
             </div>
 
+            {/* Verify Button */}
             <button
               onClick={handleVerifyOtp}
               disabled={verifyingOtp || otpCode.join('').length !== 6}
@@ -420,6 +475,7 @@ const RegisterPage = () => {
               {verifyingOtp ? 'Verifying...' : 'Verify Email'}
             </button>
 
+            {/* Resend Button */}
             <div className="text-center">
               <button
                 onClick={handleResendOtp}
