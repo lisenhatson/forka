@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import HomePage from './pages/HomePage';
+import UnsolvedPage from './pages/UnsolvedPage';
 import PostDetailPage from './pages/PostDetailPage';
 import CreatePostPage from './pages/CreatePostPage';
 import ProfilePage from './pages/ProfilePage';
@@ -147,7 +148,14 @@ function App() {
               </ProtectedRoute>
             } 
           />
-
+          <Route 
+            path="/unsolved" 
+            element={
+              <ProtectedRoute>
+                <UnsolvedPage />
+              </ProtectedRoute>
+            } 
+          />          
           {/* ✨ Admin Routes (only for admin) */}
           <Route 
             path="/admin" 
