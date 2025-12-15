@@ -258,7 +258,7 @@ const PostDetailPage = () => {
             {/* Comments Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Suggestions ({comments.length})
+                Comment ({comments.length})
               </h2>
 
               {/* Comment Form */}

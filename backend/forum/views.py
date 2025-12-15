@@ -7,6 +7,7 @@ from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from .models import User, Category, Post, Comment, Notification
 from .serializers import (
@@ -167,7 +168,7 @@ class PostViewSet(viewsets.ModelViewSet):
     """
     queryset = Post.objects.all().select_related('author', 'category').order_by('-created_at')
     serializer_class = PostSerializer
-    permission_classes = [PostPermission]
+    permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'content']
     ordering_fields = ['created_at', 'views_count', 'likes']
@@ -287,7 +288,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     """
     queryset = Comment.objects.all().select_related('author', 'post')
     serializer_class = CommentSerializer
-    permission_classes = [CommentPermission]
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     def get_queryset(self):
         """Filter comments by post"""

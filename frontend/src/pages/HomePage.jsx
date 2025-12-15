@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Bell, Plus, Eye, MessageSquare, TrendingUp, ChevronDown, Menu } from 'lucide-react';
+import { Square, SquareCheckBig, TextAlignStart, Clock, TrendingUp, Flame, Search, Bell, Plus, Eye, MessageSquare, ChevronDown, Menu, } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
 // ✅ 1. IMPORT KOMPONEN BARU
@@ -217,22 +217,15 @@ const HomePage = () => {
                     to="/home" 
                     className="flex items-center gap-3 px-3 py-2 bg-gray-100 text-primary-600 rounded-lg font-medium"
                   >
-                    <MessageSquare className="w-5 h-5" />
+                    <SquareCheckBig className="w-5 h-5" />
                     Solved
                   </Link>
                   <Link 
                     to="/unsolved" 
                     className="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg"
                   >
-                    <MessageSquare className="w-5 h-5" />
+                    <Square className="w-5 h-5" />
                     Unsolved
-                  </Link>
-                  <Link 
-                    to="/tags" 
-                    className="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg"
-                  >
-                    <Menu className="w-5 h-5" />
-                    Tags
                   </Link>
                 </nav>
 
@@ -274,7 +267,7 @@ const HomePage = () => {
                       : 'border-transparent text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  <TrendingUp className="w-5 h-5" />
+                  <Clock className="w-5 h-5" />
                   New
                 </button>
                 <button 
@@ -296,7 +289,7 @@ const HomePage = () => {
                       : 'border-transparent text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  <TrendingUp className="w-5 h-5" />
+                  <Flame className="w-5 h-5" />
                   Hot
                 </button>
               </div>
@@ -381,40 +374,18 @@ const HomePage = () => {
               {/* Must-read posts */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-primary-600" />
-                  Must-read posts
+                  <TextAlignStart className="w-5 h-5 text-primary-600" />
+                  Tags
                 </h3>
                 <ul className="space-y-3">
                   <li>
                     <Link to="#" className="text-sm text-primary-600 hover:underline">
-                      Please read rules before you start working on a platform
+                      Akademik
                     </Link>
                   </li>
                   <li>
                     <Link to="#" className="text-sm text-primary-600 hover:underline">
-                      Vision & Strategy of Alemhelp
-                    </Link>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Featured links */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h3 className="font-semibold text-gray-800 mb-4">Featured links</h3>
-                <ul className="space-y-3">
-                  <li>
-                    <Link to="#" className="text-sm text-primary-600 hover:underline">
-                      Alemhelp source-code on GitHub
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="#" className="text-sm text-primary-600 hover:underline">
-                      Golang best-practices
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="#" className="text-sm text-primary-600 hover:underline">
-                      Alem.School dashboard
+                      Kemahasiswaan
                     </Link>
                   </li>
                 </ul>

@@ -207,10 +207,11 @@ const CreatePostPage = () => {
                     onChange={handleChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
                   >
-                    <option value="">Select a category (optional)</option>
+                    <option value="">Select a category</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
+                        
                       </option>
                     ))}
                   </select>
