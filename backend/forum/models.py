@@ -144,24 +144,19 @@ class Post(models.Model):
     is_pinned = models.BooleanField(default=False)
     is_closed = models.BooleanField(default=False)
     
+    
+    is_solved = models.BooleanField(default=False)
+    solved_at = models.DateTimeField(null=True, blank=True)
+    best_answer = models.ForeignKey(
+        'Comment',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='marked_as_best'
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return self.title
-    
-    @property
-    def likes_count(self):
-        return self.likes.count()
-    
-    @property
-    def comments_count(self):
-        return self.comments.count()
-    
-    class Meta:
-        verbose_name = 'Post'
-        verbose_name_plural = 'Posts'
-        ordering = ['-is_pinned', '-created_at']
 
 
 class Comment(models.Model):

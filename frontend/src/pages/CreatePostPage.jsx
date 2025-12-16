@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, ImagePlus, AlertCircle, X } from 'lucide-react';
-import useAuthStore from '/src/stores/authStore';
-import api from '/src/config/api';
+import { ArrowLeft, ImagePlus, AlertCircle, X } from 'lucide-react'; // ✅ Ditambah AlertCircle
+import useAuthStore from 'src/stores/authStore';
+import api from 'src/config/api';
 import toast from 'react-hot-toast';
-// ✅ 1. IMPORT KOMPONEN BARU
 import { ImagePreview } from 'src/components/ImageDisplay';
 
 const CreatePostPage = () => {
@@ -18,8 +17,6 @@ const CreatePostPage = () => {
     category: ''
   });
   const [postImage, setPostImage] = useState(null);
-  // ✅ 2. HAPUS STATE imagePreview
-  // const [imagePreview, setImagePreview] = useState(null); 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,9 +25,6 @@ const CreatePostPage = () => {
     fetchCategories();
     loadDraft();
   }, []);
-
-  // ✅ 3. HAPUS useEffect untuk cleanup (tidak perlu lagi)
-  // useEffect(() => { ... }, [imagePreview]);
 
   const fetchCategories = async () => {
     try {
@@ -53,7 +47,6 @@ const CreatePostPage = () => {
     setError('');
   };
 
-  // ✅ 4. UPDATE handleImageChange
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -70,14 +63,10 @@ const CreatePostPage = () => {
     }
 
     setPostImage(file);
-    
-    // Hapus baris setImagePreview
     toast.success('Image selected!');
   };
 
-  // ✅ 5. UPDATE handleRemoveImage
   const handleRemoveImage = () => {
-    // Hapus logic revokeObjectURL
     setPostImage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -92,6 +81,13 @@ const CreatePostPage = () => {
       return;
     }
 
+    // ✅ VALIDASI KATEGORI (Baru)
+    if (!formData.category) {
+      setError('Please select a category');
+      toast.error('Category is required!');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -100,9 +96,8 @@ const CreatePostPage = () => {
       formDataToSend.append('title', formData.title);
       formDataToSend.append('content', formData.content || '');
       
-      if (formData.category) {
-        formDataToSend.append('category', formData.category);
-      }
+      // Kategori sudah pasti ada karena validasi di atas
+      formDataToSend.append('category', formData.category);
       
       if (postImage) {
         formDataToSend.append('image', postImage);
@@ -145,7 +140,6 @@ const CreatePostPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -179,15 +173,12 @@ const CreatePostPage = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
-          {/* Form */}
           <main className="flex-1">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-8">Ask a Question</h1>
 
-              {/* Error Alert */}
               {error && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
@@ -196,28 +187,29 @@ const CreatePostPage = () => {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Category Selection */}
+                {/* ✅ Kategori (Updated UI) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Choose categories
+                    Choose categories <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="category"
                     value={formData.category}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
+                    required
+                    className={`w-full px-4 py-3 border ${
+                      error && !formData.category ? 'border-red-300' : 'border-gray-300'
+                    } rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition`}
                   >
-                    <option value="">Select a category</option>
+                    <option value="" disabled>-- Select a category --</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
-                        
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Title */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Type catching attention title
@@ -233,7 +225,6 @@ const CreatePostPage = () => {
                   />
                 </div>
 
-                {/* Content */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Type your question
@@ -246,18 +237,13 @@ const CreatePostPage = () => {
                     placeholder="Describe your question in detail..."
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition resize-none"
                   />
-                  <p className="text-sm text-gray-500 mt-2">
-                    Be specific and imagine you're asking a question to another person
-                  </p>
                 </div>
 
-                {/* Image Upload */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Add image (optional)
                   </label>
                   
-                  {/* ✅ 6. GANTI LOGIC PREVIEW */}
                   {postImage ? (
                     <ImagePreview 
                       file={postImage} 
@@ -287,10 +273,8 @@ const CreatePostPage = () => {
             </div>
           </main>
 
-          {/* Sidebar - Tips */}
           <aside className="hidden lg:block w-80 flex-shrink-0">
             <div className="sticky top-24 space-y-6">
-              {/* Must-read posts */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h3 className="font-semibold text-gray-800 mb-4">Must-read posts</h3>
                 <ul className="space-y-3">
@@ -299,24 +283,15 @@ const CreatePostPage = () => {
                       Please read rules before you start working on a platform
                     </Link>
                   </li>
-                  <li>
-                    <Link to="#" className="text-sm text-primary-600 hover:underline">
-                      Vision & Strategy of ForKa
-                    </Link>
-                  </li>
                 </ul>
               </div>
 
-              {/* Writing Tips */}
               <div className="bg-primary-50 rounded-lg border border-primary-200 p-6">
                 <h3 className="font-semibold text-primary-900 mb-4">Writing Tips</h3>
                 <ul className="space-y-2 text-sm text-primary-800">
                   <li>• Be specific with your title</li>
                   <li>• Provide context and details</li>
-                  <li>• Include what you've tried</li>
-                  <li>• Use proper formatting</li>
-                  <li>• Check for similar questions</li>
-                  <li>• Add relevant images if helpful</li>
+                  <li>• Select the right category</li>
                 </ul>
               </div>
             </div>

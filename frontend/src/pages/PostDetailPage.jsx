@@ -8,13 +8,13 @@ import {
   ThumbsUp, 
   Send, 
   Edit,
-  Trash2
+  Trash2,
+  CheckCircle // ✅ Ditambah icon centang
 } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
-// ✅ 1. IMPORT KOMPONEN BARU
+import toast from 'react-hot-toast';
 import { PostImage, ProfileImage } from 'src/components/ImageDisplay';
-
 
 const PostDetailPage = () => {
   const { id } = useParams();
@@ -60,10 +60,22 @@ const PostDetailPage = () => {
     }
   };
 
+  // ✅ FITUR BARU: Mark as Solved
+  const handleMarkSolved = async () => {
+    try {
+      const response = await api.post(`/posts/${id}/mark_solved/`);
+      toast.success(response.data.is_solved ? 'Post marked as solved! ✅' : 'Post marked as unsolved');
+      fetchPost(); // Refresh data
+    } catch (error) {
+      console.error('Error marking solved:', error);
+      toast.error('Failed to update post status');
+    }
+  };
+
   const handleLikePost = async () => {
     try {
       await api.post(`/posts/${id}/like/`);
-      fetchPost(); // Refresh post data
+      fetchPost(); 
     } catch (error) {
       console.error('Error liking post:', error);
     }
@@ -80,7 +92,7 @@ const PostDetailPage = () => {
         content: commentText
       });
       setCommentText('');
-      fetchComments(); // Refresh comments
+      fetchComments(); 
     } catch (error) {
       console.error('Error submitting comment:', error);
     } finally {
@@ -139,7 +151,6 @@ const PostDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -158,16 +169,11 @@ const PostDetailPage = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
-          {/* Main Post */}
           <main className="flex-1">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-6">
-              {/* Author Info */}
               <div className="flex items-start gap-4 mb-6">
-                
-                {/* ✅ 2. GANTI AVATAR PENULIS */}
                 <ProfileImage
                   src={post.author?.profile_picture}
                   username={post.author?.username}
@@ -191,31 +197,37 @@ const PostDetailPage = () => {
                 </div>
               </div>
 
-              {/* Post Title */}
               <h1 className="text-3xl font-bold text-gray-900 mb-4">
                 {post.title}
               </h1>
 
-              {/* ✅ 3. TAMBAHKAN GAMBAR POSTINGAN */}
+              {/* ✅ TAMPILAN JIKA SOLVED */}
+              {post.is_solved && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div>
+                    <h3 className="font-semibold text-green-900">Solved</h3>
+                    <p className="text-sm text-green-700">This question has been marked as solved.</p>
+                  </div>
+                </div>
+              )}
+
               <PostImage 
                 src={post.image} 
                 alt={post.title} 
                 className="my-6" 
               />
 
-              {/* Post Content */}
               <div className="prose max-w-none mb-6">
                 <p className="text-gray-700 whitespace-pre-wrap">{post.content}</p>
               </div>
 
-              {/* Category Tags */}
               <div className="flex items-center gap-2 mb-6">
                 <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
                   {post.category_name || 'General'}
                 </span>
               </div>
 
-              {/* Post Stats */}
               <div className="flex items-center gap-6 pt-6 border-t border-gray-200">
                 <div className="flex items-center gap-2 text-gray-600">
                   <Eye className="w-5 h-5" />
@@ -235,9 +247,25 @@ const PostDetailPage = () => {
               </div>
             </div>
 
-            {/* Edit/Delete Actions (for owner or admin/moderator) */}
+            {/* Actions for Author/Admin */}
             {(user?.id === post.author?.id || user?.role === 'admin' || user?.role === 'moderator') && (
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 pt-4 border-t border-gray-200 mb-6">
+                
+                {/* ✅ TOMBOL MARK AS SOLVED (Hanya Author) */}
+                {user?.id === post.author?.id && (
+                  <button
+                    onClick={handleMarkSolved}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-medium ${
+                      post.is_solved
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-green-500 text-white hover:bg-green-600'
+                    }`}
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    {post.is_solved ? 'Mark as Unsolved' : 'Mark as Solved'}
+                  </button>
+                )}
+
                 <button
                   onClick={() => navigate(`/posts/${post.id}/edit`)}
                   className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
@@ -258,10 +286,9 @@ const PostDetailPage = () => {
             {/* Comments Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Comment ({comments.length})
+                Suggestions ({comments.length})
               </h2>
 
-              {/* Comment Form */}
               <form onSubmit={handleSubmitComment} className="mb-8">
                 <textarea
                   value={commentText}
@@ -289,7 +316,6 @@ const PostDetailPage = () => {
                 </div>
               </form>
 
-              {/* Comments List */}
               <div className="space-y-6">
                 {comments.length === 0 ? (
                   <p className="text-center text-gray-500 py-8">No comments yet. Be the first to comment!</p>
@@ -302,12 +328,9 @@ const PostDetailPage = () => {
             </div>
           </main>
 
-          {/* Sidebar - Author Profile */}
           <aside className="hidden lg:block w-80 flex-shrink-0">
             <div className="sticky top-24 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="text-center mb-4">
-                
-                {/* ✅ 4. GANTI AVATAR SIDEBAR */}
                 <ProfileImage
                   src={post.author?.profile_picture}
                   username={post.author?.username}
@@ -368,7 +391,6 @@ const CommentItem = ({ comment, postId }) => {
   const handleLike = async () => {
     try {
       await api.post(`/comments/${comment.id}/like/`);
-      // Refresh comment data
     } catch (error) {
       console.error('Error liking comment:', error);
     }
@@ -403,8 +425,6 @@ const CommentItem = ({ comment, postId }) => {
   return (
     <div className="border-l-2 border-gray-200 pl-4">
       <div className="flex items-start gap-4">
-        
-        {/* ✅ 5. GANTI AVATAR KOMENTAR */}
         <ProfileImage
           src={comment.author?.profile_picture}
           username={comment.author?.username}
@@ -448,7 +468,6 @@ const CommentItem = ({ comment, postId }) => {
             )}
           </div>
 
-          {/* Reply Form */}
           {showReplyForm && (
             <form onSubmit={handleReply} className="mt-4">
               <textarea
@@ -476,13 +495,10 @@ const CommentItem = ({ comment, postId }) => {
             </form>
           )}
 
-          {/* Replies */}
           {showReplies && replies.length > 0 && (
             <div className="mt-4 space-y-4">
               {replies.map((reply) => (
                 <div key={reply.id} className="flex items-start gap-3">
-                  
-                  {/* ✅ 6. GANTI AVATAR BALASAN */}
                   <ProfileImage
                     src={reply.author?.profile_picture}
                     username={reply.author?.username}

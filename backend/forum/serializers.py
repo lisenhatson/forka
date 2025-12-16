@@ -237,6 +237,10 @@ class PostSerializer(serializers.ModelSerializer):
             'views_count',
             'is_pinned',
             'is_closed',
+            # ✅ NEW: Mark as Solved fields
+            'is_solved',
+            'solved_at',
+            'best_answer',
             'created_at',
             'updated_at',
         ]
@@ -247,6 +251,10 @@ class PostSerializer(serializers.ModelSerializer):
             'likes_count',
             'comments_count',
             'views_count',
+            # ✅ NEW: Mark as Solved fields (read-only)
+            'is_solved',
+            'solved_at',
+            'best_answer',
             'created_at',
             'updated_at',
         ]
