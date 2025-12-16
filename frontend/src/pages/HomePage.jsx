@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Square, SquareCheckBig, Clock, TrendingUp, Flame, Search, Bell, Plus, Eye, MessageSquare, ChevronDown, Bookmark, ThumbsUp, Tag, List } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
@@ -7,6 +7,7 @@ import { ProfileImage } from 'src/components/ImageDisplay';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, logout } = useAuthStore();
   const [posts, setPosts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -18,16 +19,22 @@ const HomePage = () => {
   });
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('new');
+  const [solvedFilter, setSolvedFilter] = useState(searchParams.get('solved') || 'all'); // all, solved, unsolved
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
+    const solved = searchParams.get('solved');
+    if (solved) setSolvedFilter(solved);
+  }, [searchParams]);
+
+  useEffect(() => {
     fetchPosts();
     fetchCategories();
     fetchUserStats();
-  }, [filter, selectedCategory]);
+  }, [filter, solvedFilter, selectedCategory]);
 
   const fetchPosts = async () => {
     setLoading(true);
@@ -47,6 +54,14 @@ const HomePage = () => {
       let postsData = Array.isArray(response.data) 
         ? response.data 
         : response.data.results || [];
+      
+      // Filter by solved status
+      if (solvedFilter === 'solved') {
+        postsData = postsData.filter(post => post.is_solved === true);
+      } else if (solvedFilter === 'unsolved') {
+        postsData = postsData.filter(post => post.is_solved === false || post.is_solved === null);
+      }
+      // 'all' = no filter
       
       // For "hot" filter: posts from last 7 days with high views
       if (filter === 'hot') {
@@ -82,7 +97,6 @@ const HomePage = () => {
 
   const fetchUserStats = async () => {
     try {
-      // Get user's posts
       const postsResponse = await api.get('/posts/', {
         params: { author: user?.id }
       });
@@ -90,14 +104,12 @@ const HomePage = () => {
         ? postsResponse.data 
         : postsResponse.data.results || [];
 
-      // Get user's comments
       const commentsResponse = await api.get('/comments/');
       const allComments = Array.isArray(commentsResponse.data) 
         ? commentsResponse.data 
         : commentsResponse.data.results || [];
       const userComments = allComments.filter(c => c.author?.id === user?.id);
 
-      // Get drafts from localStorage
       const drafts = JSON.parse(localStorage.getItem('post_draft') || 'null');
       
       setUserStats({
@@ -167,6 +179,11 @@ const HomePage = () => {
       localStorage.removeItem('post_draft');
       fetchUserStats();
     }
+  };
+
+  const handleSolvedFilterChange = (newFilter) => {
+    setSolvedFilter(newFilter);
+    setSearchParams({ solved: newFilter });
   };
 
   return (
@@ -288,27 +305,39 @@ const HomePage = () => {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h3 className="font-semibold text-gray-800 mb-4">MENU</h3>
                 <nav className="space-y-1">
-                  <Link 
-                    to="/home" 
-                    className="flex items-center gap-3 px-3 py-2 bg-gray-100 text-primary-600 rounded-lg font-medium"
+                  <button
+                    onClick={() => handleSolvedFilterChange('all')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
+                      solvedFilter === 'all'
+                        ? 'bg-primary-100 text-primary-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
                   >
                     <List className="w-5 h-5" />
                     All
-                  </Link>
-                  <Link 
-                    to="/home?filter=solved" 
-                    className="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg"
+                  </button>
+                  <button
+                    onClick={() => handleSolvedFilterChange('solved')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
+                      solvedFilter === 'solved'
+                        ? 'bg-green-100 text-green-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
                   >
                     <SquareCheckBig className="w-5 h-5" />
                     Solved
-                  </Link>
-                  <Link 
-                    to="/unsolved" 
-                    className="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg"
+                  </button>
+                  <button
+                    onClick={() => handleSolvedFilterChange('unsolved')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition ${
+                      solvedFilter === 'unsolved'
+                        ? 'bg-orange-100 text-orange-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
                   >
                     <Square className="w-5 h-5" />
                     Unsolved
-                  </Link>
+                  </button>
                 </nav>
 
                 {/* Personal Navigator */}
@@ -377,21 +406,44 @@ const HomePage = () => {
 
           {/* Main Feed */}
           <main className="flex-1">
-            {/* Active Category Filter */}
-            {selectedCategory && (
-              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tag className="w-5 h-5 text-primary-600" />
-                  <span className="text-primary-900 font-medium">
-                    Filtered by: {categories.find(c => c.id === selectedCategory)?.name}
-                  </span>
+            {/* Active Filters Banner */}
+            {(selectedCategory || solvedFilter !== 'all') && (
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {solvedFilter !== 'all' && (
+                      <span className="flex items-center gap-2 px-3 py-1 bg-white border border-primary-200 rounded-full text-sm text-primary-900 font-medium">
+                        {solvedFilter === 'solved' ? (
+                          <>
+                            <SquareCheckBig className="w-4 h-4" />
+                            Solved Only
+                          </>
+                        ) : (
+                          <>
+                            <Square className="w-4 h-4" />
+                            Unsolved Only
+                          </>
+                        )}
+                      </span>
+                    )}
+                    {selectedCategory && (
+                      <span className="flex items-center gap-2 px-3 py-1 bg-white border border-primary-200 rounded-full text-sm text-primary-900 font-medium">
+                        <Tag className="w-4 h-4" />
+                        {categories.find(c => c.id === selectedCategory)?.name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSolvedFilter('all');
+                      setSelectedCategory(null);
+                      setSearchParams({});
+                    }}
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                  >
+                    Clear all filters
+                  </button>
                 </div>
-                <button
-                  onClick={() => setSelectedCategory(null)}
-                  className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                >
-                  Clear filter
-                </button>
               </div>
             )}
 
@@ -444,7 +496,13 @@ const HomePage = () => {
               </div>
             ) : posts.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-                <p className="text-gray-600">No posts found</p>
+                <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 text-lg mb-2">No posts found</p>
+                <p className="text-gray-500 text-sm">
+                  {solvedFilter === 'solved' && 'No solved posts yet.'}
+                  {solvedFilter === 'unsolved' && 'No unsolved posts yet.'}
+                  {selectedCategory && 'Try selecting a different category.'}
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -514,10 +572,9 @@ const HomePage = () => {
             )}
           </main>
 
-          {/* Right Sidebar - Tags/Categories */}
+          {/* Right Sidebar */}
           <aside className="hidden xl:block w-80 flex-shrink-0">
             <div className="sticky top-24 space-y-6">
-              {/* Categories Section */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -554,7 +611,6 @@ const HomePage = () => {
                 )}
               </div>
 
-              {/* Must Read Posts */}
               <div className="bg-primary-50 rounded-lg border border-primary-200 p-4">
                 <h3 className="font-semibold text-primary-900 mb-4">Must Read</h3>
                 <ul className="space-y-3">
@@ -580,7 +636,7 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Logout Confirmation Modal */}
+      {/* Logout Modal */}
       {showLogoutModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm mx-4">
