@@ -9,7 +9,7 @@ import {
   Send, 
   Edit,
   Trash2,
-  CheckCircle // ✅ Ditambah icon centang
+  CheckCircle
 } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
@@ -60,12 +60,11 @@ const PostDetailPage = () => {
     }
   };
 
-  // ✅ FITUR BARU: Mark as Solved
   const handleMarkSolved = async () => {
     try {
       const response = await api.post(`/posts/${id}/mark_solved/`);
       toast.success(response.data.is_solved ? 'Post marked as solved! ✅' : 'Post marked as unsolved');
-      fetchPost(); // Refresh data
+      fetchPost();
     } catch (error) {
       console.error('Error marking solved:', error);
       toast.error('Failed to update post status');
@@ -92,9 +91,11 @@ const PostDetailPage = () => {
         content: commentText
       });
       setCommentText('');
-      fetchComments(); 
+      fetchComments();
+      toast.success('Comment posted!');
     } catch (error) {
       console.error('Error submitting comment:', error);
+      toast.error('Failed to post comment');
     } finally {
       setSubmitting(false);
     }
@@ -107,10 +108,11 @@ const PostDetailPage = () => {
 
     try {
       await api.delete(`/posts/${id}/`);
+      toast.success('Post deleted successfully');
       navigate('/home');
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('Failed to delete post');
+      toast.error('Failed to delete post');
     }
   };
 
@@ -201,7 +203,6 @@ const PostDetailPage = () => {
                 {post.title}
               </h1>
 
-              {/* ✅ TAMPILAN JIKA SOLVED */}
               {post.is_solved && (
                 <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
                   <CheckCircle className="w-6 h-6 text-green-600" />
@@ -250,8 +251,6 @@ const PostDetailPage = () => {
             {/* Actions for Author/Admin */}
             {(user?.id === post.author?.id || user?.role === 'admin' || user?.role === 'moderator') && (
               <div className="flex gap-3 pt-4 border-t border-gray-200 mb-6">
-                
-                {/* ✅ TOMBOL MARK AS SOLVED (Hanya Author) */}
                 {user?.id === post.author?.id && (
                   <button
                     onClick={handleMarkSolved}
@@ -286,14 +285,14 @@ const PostDetailPage = () => {
             {/* Comments Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Suggestions ({comments.length})
+                Comments ({comments.length})
               </h2>
 
               <form onSubmit={handleSubmitComment} className="mb-8">
                 <textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Type here your wise suggestion"
+                  placeholder="Write your comment here..."
                   rows="4"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition resize-none"
                 />
@@ -311,7 +310,7 @@ const PostDetailPage = () => {
                     className="flex items-center gap-2 px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-4 h-4" />
-                    {submitting ? 'Posting...' : 'Suggest'}
+                    {submitting ? 'Posting...' : 'Post Comment'}
                   </button>
                 </div>
               </form>
@@ -410,8 +409,10 @@ const CommentItem = ({ comment, postId }) => {
       setShowReplyForm(false);
       fetchReplies();
       setShowReplies(true);
+      toast.success('Reply posted!');
     } catch (error) {
       console.error('Error replying:', error);
+      toast.error('Failed to post reply');
     }
   };
 

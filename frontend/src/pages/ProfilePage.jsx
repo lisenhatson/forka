@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Github, Instagram, Facebook, Calendar, Edit } from 'lucide-react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Github, Instagram, Facebook, Calendar, Edit, MessageSquare, ThumbsUp } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
 import EditProfileModal from 'src/components/EditProfileModal';
@@ -9,24 +9,33 @@ import { ProfileImage } from 'src/components/ImageDisplay';
 const ProfilePage = () => {
   const { username } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useAuthStore((state) => state.user);
   
   const [profileUser, setProfileUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
+  const [userComments, setUserComments] = useState([]);
+  const [likedPosts, setLikedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('posts');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'posts');
   const [showEditModal, setShowEditModal] = useState(false);
 
   const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
+
+  useEffect(() => {
     fetchUserProfile();
     fetchUserPosts();
-  }, [username]);
+    if (activeTab === 'comments') fetchUserComments();
+    if (activeTab === 'likes') fetchLikedPosts();
+  }, [username, activeTab]);
 
   const fetchUserProfile = async () => {
     try {
-      // ✅ Fix: Get all users and find by username
       const response = await api.get('/users/');
       const usersData = Array.isArray(response.data) 
         ? response.data 
@@ -35,7 +44,6 @@ const ProfilePage = () => {
       const user = usersData.find(u => u.username === username);
       
       if (user) {
-        // ✅ Get detailed user info
         const detailResponse = await api.get(`/users/${user.id}/`);
         setProfileUser(detailResponse.data);
       } else {
@@ -51,28 +59,54 @@ const ProfilePage = () => {
 
   const fetchUserPosts = async () => {
     try {
-      const response = await api.get('/posts/', {
-        params: { author__username: username }
-      });
-      
+      const response = await api.get('/posts/');
       const postsData = Array.isArray(response.data) 
         ? response.data 
         : response.data.results || [];
       
-      setUserPosts(postsData);
+      const filtered = postsData.filter(post => post.author?.username === username);
+      setUserPosts(filtered);
     } catch (error) {
       console.error('Error fetching user posts:', error);
       setUserPosts([]);
     }
   };
 
+  const fetchUserComments = async () => {
+    try {
+      const response = await api.get('/comments/');
+      const commentsData = Array.isArray(response.data) 
+        ? response.data 
+        : response.data.results || [];
+      
+      const filtered = commentsData.filter(comment => comment.author?.username === username);
+      setUserComments(filtered);
+    } catch (error) {
+      console.error('Error fetching user comments:', error);
+      setUserComments([]);
+    }
+  };
+
+  const fetchLikedPosts = async () => {
+    try {
+      setLikedPosts([]);
+    } catch (error) {
+      console.error('Error fetching liked posts:', error);
+      setLikedPosts([]);
+    }
+  };
+
   const handleProfileUpdate = (updatedUser) => {
     setProfileUser(updatedUser);
     if (isOwnProfile) {
-      // Update current user in auth store
       const { updateUser } = useAuthStore.getState();
       updateUser(updatedUser);
     }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
   };
 
   const formatDate = (dateString) => {
@@ -136,8 +170,6 @@ const ProfilePage = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
               {/* Profile Picture */}
               <div className="text-center mb-6">
-                
-                {/* ✅ 2. GANTI AVATAR PROFIL */}
                 <ProfileImage
                   src={profileUser.profile_picture}
                   username={profileUser.username}
@@ -221,13 +253,13 @@ const ProfilePage = () => {
             </div>
           </aside>
 
-          {/* Main Content - Posts */}
+          {/* Main Content - Posts/Comments/Likes */}
           <main className="flex-1">
             {/* Tabs */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
               <div className="flex border-b border-gray-200">
                 <button 
-                  onClick={() => setActiveTab('posts')}
+                  onClick={() => handleTabChange('posts')}
                   className={`flex-1 px-6 py-3 font-medium border-b-2 transition ${
                     activeTab === 'posts' 
                       ? 'border-primary-500 text-primary-600' 
@@ -237,34 +269,43 @@ const ProfilePage = () => {
                   Posts ({userPosts.length})
                 </button>
                 <button 
-                  onClick={() => setActiveTab('comments')}
+                  onClick={() => handleTabChange('comments')}
                   className={`flex-1 px-6 py-3 font-medium border-b-2 transition ${
                     activeTab === 'comments' 
                       ? 'border-primary-500 text-primary-600' 
                       : 'border-transparent text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  Comments
+                  Comments ({userComments.length})
                 </button>
                 <button 
-                  onClick={() => setActiveTab('likes')}
+                  onClick={() => handleTabChange('likes')}
                   className={`flex-1 px-6 py-3 font-medium border-b-2 transition ${
                     activeTab === 'likes' 
                       ? 'border-primary-500 text-primary-600' 
                       : 'border-transparent text-gray-600 hover:text-gray-800'
                   }`}
                 >
-                  Liked
+                  Liked ({likedPosts.length})
                 </button>
               </div>
             </div>
 
-            {/* Content */}
+            {/* Posts Tab */}
             {activeTab === 'posts' && (
               <div className="space-y-4">
                 {userPosts.length === 0 ? (
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                    <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-600">No posts yet</p>
+                    {isOwnProfile && (
+                      <Link 
+                        to="/ask"
+                        className="inline-block mt-4 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
+                      >
+                        Create your first post
+                      </Link>
+                    )}
                   </div>
                 ) : (
                   userPosts.map((post) => (
@@ -283,6 +324,11 @@ const ProfilePage = () => {
                         <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
                           {post.category_name || 'General'}
                         </span>
+                        {post.is_solved && (
+                          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                            ✓ Solved
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-6 text-sm text-gray-600">
                         <span>{post.views_count} views</span>
@@ -298,15 +344,50 @@ const ProfilePage = () => {
               </div>
             )}
 
+            {/* Comments Tab */}
             {activeTab === 'comments' && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-                <p className="text-gray-600">Comments will be displayed here</p>
+              <div className="space-y-4">
+                {userComments.length === 0 ? (
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                    <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600">No comments yet</p>
+                  </div>
+                ) : (
+                  userComments.map((comment) => (
+                    <div 
+                      key={comment.id}
+                      className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+                    >
+                      <p className="text-gray-700 mb-3">{comment.content}</p>
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <Link 
+                          to={`/posts/${comment.post}`}
+                          className="text-primary-600 hover:underline"
+                        >
+                          View post →
+                        </Link>
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-1">
+                            <ThumbsUp className="w-4 h-4" />
+                            {comment.likes_count}
+                          </span>
+                          <span>{new Date(comment.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
 
+            {/* Liked Tab */}
             {activeTab === 'likes' && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-                <p className="text-gray-600">Liked posts will be displayed here</p>
+                <ThumbsUp className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600">Liked posts feature coming soon</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  This feature requires backend implementation to track liked posts
+                </p>
               </div>
             )}
           </main>
