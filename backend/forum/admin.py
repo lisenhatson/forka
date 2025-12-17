@@ -39,7 +39,8 @@ class UserAdmin(BaseUserAdmin):
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     """Category Admin"""
-    list_display = ['name', 'slug', 'color', 'created_at']
+    list_display = ['name', 'slug', 'color', 'order', 'created_at']
+    list_editable = ("order",)
     search_fields = ['name', 'description']
     prepopulated_fields = {'slug': ('name',)}
     list_filter = ['created_at']

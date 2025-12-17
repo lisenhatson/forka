@@ -188,25 +188,25 @@ class PostViewSet(viewsets.ModelViewSet):
         return context
     
     def get_queryset(self):
-        """Filter posts berdasarkan query params"""
-        queryset = super().get_queryset()
-        
-        # Filter by category
-        category_slug = self.request.query_params.get('category', None)
-        if category_slug:
-            queryset = queryset.filter(category__slug=category_slug)
-        
-        # Filter by author ID
-        author_id = self.request.query_params.get('author', None)
-        if author_id:
-            queryset = queryset.filter(author__id=author_id)
+        queryset = Post.objects.select_related(
+            'author', 'category'
+        ).prefetch_related(
+            'comments'
+        )
 
-        # ✅ Filter by author username (NEW)
-        author_username = self.request.query_params.get('author__username', None)
-        if author_username:
-            queryset = queryset.filter(author__username=author_username)
-        
+        category_id = self.request.query_params.get('category')
+        author_id = self.request.query_params.get('author')
+
+        print("🔥 CATEGORY PARAM:", category_id)
+
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+
+        if author_id:
+            queryset = queryset.filter(author_id=author_id)
+
         return queryset
+
     
     def perform_create(self, serializer):
         """Auto set author & generate slug, handle image"""
@@ -294,22 +294,22 @@ class CommentViewSet(viewsets.ModelViewSet):
     permission_classes = [CommentPermission]
     
     def get_queryset(self):
-        """Filter comments by post OR author"""
         queryset = super().get_queryset()
-        
-        post_id = self.request.query_params.get('post', None)
-        if post_id:
-            queryset = queryset.filter(post__id=post_id)
-        
-        # ✅ Filter by author username (NEW - needed for Profile Page)
-        author_username = self.request.query_params.get('author__username', None)
-        if author_username:
-            queryset = queryset.filter(author__username=author_username)
-        
-        if self.request.query_params.get('top_level', None):
-            queryset = queryset.filter(parent__isnull=True)
-        
+
+        category = self.request.query_params.get('category')
+        print("🔥 CATEGORY PARAM:", category)
+
+        if category:
+            # frontend kirim ID
+            queryset = queryset.filter(category_id=category)
+
+        author_id = self.request.query_params.get('author')
+        if author_id:
+            queryset = queryset.filter(author__id=author_id)
+
         return queryset
+
+
     
     def perform_create(self, serializer):
         """Auto set author"""
@@ -370,4 +370,3 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         """Mark all notifications as read"""
         Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({'status': 'all marked as read'})
-}

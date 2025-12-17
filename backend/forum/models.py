@@ -119,6 +119,7 @@ class Category(models.Model):
     icon = models.CharField(max_length=50, blank=True)
     color = models.CharField(max_length=7, default='#3B82F6')
     created_at = models.DateTimeField(auto_now_add=True)
+    order = models.PositiveIntegerField(default=0)
     
     def __str__(self):
         return self.name
@@ -126,7 +127,7 @@ class Category(models.Model):
     class Meta:
         verbose_name = 'Category'
         verbose_name_plural = 'Categories'
-        ordering = ['name']
+        ordering = ["order", "name"]
 
 
 class Post(models.Model):

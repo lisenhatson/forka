@@ -525,15 +525,20 @@ const HomePage = () => {
                           <span className="font-medium text-gray-900">{post.author?.username}</span>
                           <span>•</span>
                           <span>{formatDate(post.created_at)}</span>
-                          {post.is_solved && (
-                            <>
-                              <span>•</span>
-                              <span className="flex items-center gap-1 text-green-600 font-medium">
-                                <SquareCheckBig className="w-4 h-4" />
-                                Solved
-                              </span>
-                            </>
+                        <>
+                          <span>•</span>
+                          {post.is_solved ? (
+                            <span className="flex items-center gap-1 text-green-600 font-medium">
+                              <SquareCheckBig className="w-4 h-4" />
+                              Solved
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-gray-400 font-medium">
+                              <Square className="w-4 h-4" />
+                              Unsolved
+                            </span>
                           )}
+                        </>
                         </div>
 
                         <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600">
