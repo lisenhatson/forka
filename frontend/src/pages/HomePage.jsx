@@ -125,23 +125,25 @@ const HomePage = () => {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!searchQuery.trim()) {
-      fetchPosts();
-      return;
-    }
-    
     setLoading(true);
+
     try {
       const response = await api.get('/posts/', {
         params: { search: searchQuery }
       });
-      setPosts(response.data);
+
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data.results || [];
+
+      setPosts(data);
     } catch (error) {
       console.error('Error searching posts:', error);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -226,11 +228,7 @@ const HomePage = () => {
                 <span className="hidden sm:inline">Ask a question</span>
               </button>
 
-              <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <Bell className="w-6 h-6" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-
+              
               <div className="relative">
                 <button 
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -361,15 +359,7 @@ const HomePage = () => {
                       {userStats.myComments}
                     </span>
                   </Link>
-                  <Link 
-                    to={`/profile/${user?.username}?tab=likes`}
-                    className="flex items-center justify-between px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg group"
-                  >
-                    <span className="text-sm">Your likes & votes</span>
-                    <span className="text-xs bg-gray-200 group-hover:bg-primary-100 group-hover:text-primary-700 px-2 py-0.5 rounded-full">
-                      {userStats.myLikes}
-                    </span>
-                  </Link>
+                  
                   
                   {/* Draft Section */}
                   {userStats.drafts > 0 && (
@@ -564,10 +554,6 @@ const HomePage = () => {
                             <MessageSquare className="w-4 h-4" />
                             <span>{post.comments_count}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <ThumbsUp className="w-4 h-4" />
-                            <span>{post.likes_count}</span>
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -614,27 +600,6 @@ const HomePage = () => {
                     ))}
                   </div>
                 )}
-              </div>
-
-              <div className="bg-primary-50 rounded-lg border border-primary-200 p-4">
-                <h3 className="font-semibold text-primary-900 mb-4">Must Read</h3>
-                <ul className="space-y-3">
-                  <li>
-                    <Link to="#" className="text-sm text-primary-700 hover:text-primary-900 hover:underline">
-                      📌 Forum Guidelines & Rules
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="#" className="text-sm text-primary-700 hover:text-primary-900 hover:underline">
-                      💡 How to Ask Good Questions
-                    </Link>
-                  </li>
-                  <li>
-                    <Link to="#" className="text-sm text-primary-700 hover:text-primary-900 hover:underline">
-                      ⭐ Best Answers of the Month
-                    </Link>
-                  </li>
-                </ul>
               </div>
             </div>
           </aside>

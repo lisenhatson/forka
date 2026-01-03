@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Edit, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
@@ -15,16 +15,29 @@ const ProfilePage = () => {
   const [userPosts, setUserPosts] = useState([]);
   const [userComments, setUserComments] = useState([]); // ✅ State baru untuk komentar
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('posts');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab') || 'posts';
+  const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [showEditModal, setShowEditModal] = useState(false);
 
   const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
+    setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
+
+  useEffect(() => {
     fetchUserProfile();
-    fetchUserPosts();
-    fetchUserComments(); // ✅ Fetch komentar
   }, [username]);
+
+  useEffect(() => {
+    if (profileUser?.id) {
+      fetchUserPosts(profileUser.id);
+      fetchUserComments(profileUser.id);
+    }
+  }, [profileUser]);
+
+
 
   const fetchUserProfile = async () => {
     try {
@@ -50,40 +63,18 @@ const ProfilePage = () => {
   };
 
   // ✅ Fetch Posts hanya milik user ini
-  const fetchUserPosts = async () => {
-    try {
-      const response = await api.get('/posts/', {
-        params: { author__username: username }
-      });
-      
-      const postsData = Array.isArray(response.data) 
-        ? response.data 
-        : response.data.results || [];
-      
-      setUserPosts(postsData);
-    } catch (error) {
-      console.error('Error fetching user posts:', error);
-      setUserPosts([]);
-    }
+  const fetchUserPosts = async (userId) => {
+    const res = await api.get('/posts/', { params: { author: userId }});
+    setUserPosts(res.data.results ?? res.data);
   };
 
+
   // ✅ Fetch Comments hanya milik user ini
-  const fetchUserComments = async () => {
-    try {
-      const response = await api.get('/comments/', {
-        params: { author__username: username }
-      });
-      
-      const commentsData = Array.isArray(response.data) 
-        ? response.data 
-        : response.data.results || [];
-      
-      setUserComments(commentsData);
-    } catch (error) {
-      console.error('Error fetching user comments:', error);
-      setUserComments([]);
-    }
+  const fetchUserComments = async (userId) => {
+    const res = await api.get('/comments/', { params: { author: userId }});
+    setUserComments(res.data.results ?? res.data);
   };
+
 
   const handleProfileUpdate = (updatedUser) => {
     setProfileUser(updatedUser);
@@ -286,7 +277,6 @@ const ProfilePage = () => {
                       <div className="flex items-center gap-6 text-sm text-gray-600">
                         <span>{post.views_count} views</span>
                         <span>{post.comments_count} comments</span>
-                        <span>{post.likes_count} likes</span>
                         <span className="ml-auto">
                           {new Date(post.created_at).toLocaleDateString()}
                         </span>

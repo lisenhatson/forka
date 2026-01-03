@@ -54,12 +54,6 @@ const LandingPage = () => {
             >
               Mulai Sekarang
             </Link>
-            <Link 
-              to="/about"
-              className="px-8 py-3 bg-white text-primary-600 border-2 border-primary-500 rounded-lg hover:bg-primary-50 transition font-semibold text-lg"
-            >
-              Pelajari Lebih Lanjut
-            </Link>
           </div>
         </div>
 

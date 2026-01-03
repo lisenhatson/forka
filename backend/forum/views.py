@@ -7,6 +7,9 @@ from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.db.models import Count
+from django.utils.timezone import now
+from datetime import timedelta
 
 from .models import User, Category, Post, Comment, Notification
 from .serializers import (
@@ -161,124 +164,156 @@ class CategoryViewSet(viewsets.ModelViewSet):
 # POST VIEWSET (Updated untuk Image Upload & Filtering)
 # ============================================
 
+# ============================================
+# POST VIEWSET (FIXED & CONSISTENT)
+# ============================================
+
 class PostViewSet(viewsets.ModelViewSet):
     """
-    API endpoint untuk Posts dengan image upload support
+    API endpoint untuk Posts
+    - support image upload
+    - filter author & category
+    - search
+    - ordering
+    - comments_count annotation
     """
-    queryset = Post.objects.all().select_related('author', 'category').order_by('-created_at')
     serializer_class = PostSerializer
     permission_classes = [PostPermission]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'content']
-    ordering_fields = ['created_at', 'views_count', 'likes']
-    
-    # Parsers untuk handle multipart/form-data (image upload)
+    ordering_fields = ['created_at', 'views_count']
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    
+
     def get_serializer_class(self):
-        """Pakai serializer berbeda untuk create"""
         if self.action == 'create':
             return PostCreateSerializer
         return PostSerializer
-    
+
     def get_serializer_context(self):
-        """Pass request context untuk image URL"""
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
-    
+
     def get_queryset(self):
-        queryset = Post.objects.select_related(
-            'author', 'category'
-        ).prefetch_related(
-            'comments'
+        """
+        🔥 SATU-SATUNYA SUMBER QUERYSET
+        """
+
+        queryset = (
+            Post.objects
+            .select_related('author', 'category')
+            .annotate(comments_count=Count('comments'))
         )
 
-        category_id = self.request.query_params.get('category')
+        # ==========================
+        # FILTER PARAMS
+        # ==========================
+
         author_id = self.request.query_params.get('author')
-
-        print("🔥 CATEGORY PARAM:", category_id)
-
-        if category_id:
-            queryset = queryset.filter(category_id=category_id)
-
         if author_id:
             queryset = queryset.filter(author_id=author_id)
 
+        category_id = self.request.query_params.get('category')
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+
+        # ==========================
+        # SORT / FILTER TYPE
+        # ==========================
+
+        filter_type = self.request.query_params.get('filter')
+
+        if filter_type == 'new':
+            queryset = queryset.order_by('-created_at')
+
+        elif filter_type == 'top':
+            queryset = queryset.order_by('-comments_count', '-created_at')
+
+        elif filter_type == 'hot':
+            seven_days_ago = now() - timedelta(days=7)
+            queryset = queryset.filter(
+                created_at__gte=seven_days_ago
+            ).order_by('-views_count')
+
+        else:
+            queryset = queryset.order_by('-created_at')
+
         return queryset
 
-    
+    # ==========================
+    # CREATE
+    # ==========================
+
     def perform_create(self, serializer):
-        """Auto set author & generate slug, handle image"""
         title = serializer.validated_data.get('title')
         slug = slugify(title)
-        
-        # Generate unique slug
+
         original_slug = slug
         counter = 1
         while Post.objects.filter(slug=slug).exists():
             slug = f"{original_slug}-{counter}"
             counter += 1
-        
+
         serializer.save(author=self.request.user, slug=slug)
-    
+
     def create(self, request, *args, **kwargs):
-        """Override create to return full post data dengan image URL"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        
-        # Return full post data using PostSerializer
+
         post = Post.objects.get(id=serializer.instance.id)
-        output_serializer = PostSerializer(post, context={'request': request})
-        headers = self.get_success_headers(output_serializer.data)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
+        output_serializer = PostSerializer(
+            post,
+            context={'request': request}
+        )
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+    # ==========================
+    # RETRIEVE
+    # ==========================
+
     def retrieve(self, request, *args, **kwargs):
-        """Increment views saat post dibuka"""
-        instance = self.get_object()
-        instance.views_count += 1
-        instance.save()
-        serializer = self.get_serializer(instance)
+        post = self.get_object()
+        post.views_count += 1
+        post.save(update_fields=['views_count'])
+        serializer = self.get_serializer(post)
         return Response(serializer.data)
-    
+
+    # ==========================
+    # ACTIONS
+    # ==========================
+
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
-        """Like/Unlike post"""
         post = self.get_object()
-        
+
         if request.user in post.likes.all():
             post.likes.remove(request.user)
             return Response({
                 'status': 'unliked',
                 'likes_count': post.likes.count()
             })
-        else:
-            post.likes.add(request.user)
-            return Response({
-                'status': 'liked',
-                'likes_count': post.likes.count()
-            })
-    
+
+        post.likes.add(request.user)
+        return Response({
+            'status': 'liked',
+            'likes_count': post.likes.count()
+        })
+
     @action(detail=True, methods=['post'], permission_classes=[IsModeratorOrAdmin])
     def pin(self, request, pk=None):
-        """Pin/Unpin post (moderator/admin only)"""
         post = self.get_object()
         post.is_pinned = not post.is_pinned
-        post.save()
-        return Response({
-            'status': 'pinned' if post.is_pinned else 'unpinned'
-        })
-    
+        post.save(update_fields=['is_pinned'])
+        return Response({'status': 'pinned' if post.is_pinned else 'unpinned'})
+
     @action(detail=True, methods=['post'], permission_classes=[IsModeratorOrAdmin])
     def close(self, request, pk=None):
-        """Close/Open post (moderator/admin only)"""
         post = self.get_object()
         post.is_closed = not post.is_closed
-        post.save()
-        return Response({
-            'status': 'closed' if post.is_closed else 'opened'
-        })
+        post.save(update_fields=['is_closed'])
+        return Response({'status': 'closed' if post.is_closed else 'opened'})
+
 
 
 # ============================================
@@ -286,34 +321,41 @@ class PostViewSet(viewsets.ModelViewSet):
 # ============================================
 
 class CommentViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint untuk Comments
-    """
     queryset = Comment.objects.all().select_related('author', 'post')
     serializer_class = CommentSerializer
     permission_classes = [CommentPermission]
-    
+    ordering = ['-created_at']
+
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = Comment.objects.select_related('author', 'post')
 
-        category = self.request.query_params.get('category')
-        print("🔥 CATEGORY PARAM:", category)
+        # ✅ filter by post
+        post_id = self.request.query_params.get('post')
+        if post_id:
+            queryset = queryset.filter(post_id=post_id)
 
-        if category:
-            # frontend kirim ID
-            queryset = queryset.filter(category_id=category)
+        # ✅ top level only (comment utama)
+        top_level = self.request.query_params.get('top_level')
+        if top_level == 'true':
+            queryset = queryset.filter(parent__isnull=True)
 
+        # optional filters
         author_id = self.request.query_params.get('author')
         if author_id:
-            queryset = queryset.filter(author__id=author_id)
+            queryset = queryset.filter(author_id=author_id)
 
         return queryset
 
 
-    
+
+
     def perform_create(self, serializer):
-        """Auto set author"""
         serializer.save(author=self.request.user)
+
+
+
+    
+    
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
@@ -335,10 +377,9 @@ class CommentViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def replies(self, request, pk=None):
-        """Get replies untuk comment ini"""
         comment = self.get_object()
-        replies = Comment.objects.filter(parent=comment)
-        serializer = CommentSerializer(replies, many=True)
+        replies = comment.replies.select_related('author')
+        serializer = self.get_serializer(replies, many=True)
         return Response(serializer.data)
 
 

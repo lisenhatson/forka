@@ -60,6 +60,11 @@ const PostDetailPage = () => {
     }
   };
 
+  const totalComments = comments.reduce(
+    (sum, c) => sum + 1 + c.replies_count,
+    0
+  );
+
   const handleMarkSolved = async () => {
     try {
       const response = await api.post(`/posts/${id}/mark_solved/`);
@@ -238,13 +243,6 @@ const PostDetailPage = () => {
                   <MessageSquare className="w-5 h-5" />
                   <span>{post.comments_count}</span>
                 </div>
-                <button 
-                  onClick={handleLikePost}
-                  className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition"
-                >
-                  <TrendingUp className="w-5 h-5" />
-                  <span>{post.likes_count}</span>
-                </button>
               </div>
             </div>
 
@@ -265,13 +263,7 @@ const PostDetailPage = () => {
                   </button>
                 )}
 
-                <button
-                  onClick={() => navigate(`/posts/${post.id}/edit`)}
-                  className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </button>
+                
                 <button
                   onClick={handleDeletePost}
                   className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
@@ -285,7 +277,7 @@ const PostDetailPage = () => {
             {/* Comments Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Comments ({comments.length})
+                Comments ({totalComments})
               </h2>
 
               <form onSubmit={handleSubmitComment} className="mb-8">
@@ -342,20 +334,6 @@ const PostDetailPage = () => {
                 </h3>
               </div>
 
-              <div className="flex justify-center gap-8 mb-6 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-primary-600">
-                    {post.likes_count}
-                  </div>
-                  <div className="text-sm text-gray-600">Likes</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-primary-600">
-                    {post.comments_count}
-                  </div>
-                  <div className="text-sm text-gray-600">Comments</div>
-                </div>
-              </div>
 
               <Link
                 to={`/profile/${post.author?.username}`}

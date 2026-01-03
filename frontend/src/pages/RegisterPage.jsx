@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, CheckCircle, X, Mail } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
-import useAuthStore from 'src/stores/authStore';
 
 // ============================================
 // HELPER FUNCTIONS
@@ -57,7 +56,6 @@ const getStrengthText = (score) => {
 
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const { setAuth } = useAuthStore(); // ✅ Ambil setAuth dari store
   
   // Refs untuk OTP input
   const otpRefs = useRef([]);
@@ -175,7 +173,7 @@ const RegisterPage = () => {
     }
   };
 
-  // ✅ VERIFY OTP - FIX AUTH FLOW
+  // ✅ VERIFY OTP - REDIRECT TO LOGIN
   const handleVerifyOtp = async () => {
     const code = otpCode.join('');
     
@@ -194,14 +192,20 @@ const RegisterPage = () => {
 
       console.log('✅ Verify response:', response.data);
 
-      // ✅ CRITICAL FIX: Set auth properly
-      if (response.data.tokens && response.data.user) {
-        setAuth(response.data.user, response.data.tokens);
-        toast.success('Email verified successfully! 🎉');
-        setTimeout(() => navigate('/home'), 1000);
-      } else {
-        throw new Error('Invalid response format');
-      }
+      // ✅ CHANGED: Redirect to login instead of auto-login
+      toast.success('Email verified successfully! Please login to continue.', {
+        duration: 4000
+      });
+      
+      // Delay redirect sedikit agar toast terlihat
+      setTimeout(() => {
+        navigate('/login', { 
+          state: { 
+            message: 'Registration successful! Please login with your credentials.',
+            email: formData.email 
+          } 
+        });
+      }, 1500);
       
     } catch (error) {
       console.error('❌ Verify error:', error.response?.data);
@@ -454,7 +458,7 @@ const RegisterPage = () => {
                 <input
                   key={index}
                   ref={(el) => (otpRefs.current[index] = el)}
-                  type="password"
+                  type="number"
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   maxLength="1"
