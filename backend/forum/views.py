@@ -1,13 +1,18 @@
+# backend/forum/views.py
+"""
+Complete Forum Views with Mark as Solved Feature
+Updated: 2025-01-05
+"""
+
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils.text import slugify
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from django.db.models import Count
 from django.utils.timezone import now
 from datetime import timedelta
 
@@ -161,11 +166,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 # ============================================
-# POST VIEWSET (Updated untuk Image Upload & Filtering)
-# ============================================
-
-# ============================================
-# POST VIEWSET (FIXED & CONSISTENT)
+# POST VIEWSET - WITH MARK AS SOLVED
 # ============================================
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -176,6 +177,7 @@ class PostViewSet(viewsets.ModelViewSet):
     - search
     - ordering
     - comments_count annotation
+    - mark as solved feature
     """
     serializer_class = PostSerializer
     permission_classes = [PostPermission]
@@ -196,31 +198,25 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        🔥 SATU-SATUNYA SUMBER QUERYSET
+        Queryset with filters and annotations
         """
-
         queryset = (
             Post.objects
             .select_related('author', 'category')
             .annotate(comments_count=Count('comments'))
         )
 
-        # ==========================
-        # FILTER PARAMS
-        # ==========================
-
+        # Filter by author
         author_id = self.request.query_params.get('author')
         if author_id:
             queryset = queryset.filter(author_id=author_id)
 
+        # Filter by category
         category_id = self.request.query_params.get('category')
         if category_id:
             queryset = queryset.filter(category_id=category_id)
 
-        # ==========================
-        # SORT / FILTER TYPE
-        # ==========================
-
+        # Filter type (new, top, hot)
         filter_type = self.request.query_params.get('filter')
 
         if filter_type == 'new':
@@ -240,14 +236,12 @@ class PostViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    # ==========================
-    # CREATE
-    # ==========================
-
     def perform_create(self, serializer):
+        """Create post with auto-generated slug"""
         title = serializer.validated_data.get('title')
         slug = slugify(title)
 
+        # Ensure unique slug
         original_slug = slug
         counter = 1
         while Post.objects.filter(slug=slug).exists():
@@ -257,6 +251,7 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user, slug=slug)
 
     def create(self, request, *args, **kwargs):
+        """Create post and return full serializer"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -268,23 +263,21 @@ class PostViewSet(viewsets.ModelViewSet):
         )
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-    # ==========================
-    # RETRIEVE
-    # ==========================
-
     def retrieve(self, request, *args, **kwargs):
+        """Retrieve post and increment view count"""
         post = self.get_object()
         post.views_count += 1
         post.save(update_fields=['views_count'])
         serializer = self.get_serializer(post)
         return Response(serializer.data)
 
-    # ==========================
-    # ACTIONS
-    # ==========================
+    # ============================================
+    # POST ACTIONS
+    # ============================================
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
+        """Like/Unlike post"""
         post = self.get_object()
 
         if request.user in post.likes.all():
@@ -302,22 +295,99 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsModeratorOrAdmin])
     def pin(self, request, pk=None):
+        """Pin/Unpin post (Moderator/Admin only)"""
         post = self.get_object()
         post.is_pinned = not post.is_pinned
         post.save(update_fields=['is_pinned'])
-        return Response({'status': 'pinned' if post.is_pinned else 'unpinned'})
+        
+        return Response({
+            'status': 'pinned' if post.is_pinned else 'unpinned',
+            'is_pinned': post.is_pinned
+        })
 
     @action(detail=True, methods=['post'], permission_classes=[IsModeratorOrAdmin])
     def close(self, request, pk=None):
+        """Close/Open post (Moderator/Admin only)"""
         post = self.get_object()
         post.is_closed = not post.is_closed
         post.save(update_fields=['is_closed'])
-        return Response({'status': 'closed' if post.is_closed else 'opened'})
+        
+        return Response({
+            'status': 'closed' if post.is_closed else 'opened',
+            'is_closed': post.is_closed
+        })
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def mark_solved(self, request, pk=None):
+        """
+        Mark post as solved/unsolved (only post author can do this)
+        
+        Security:
+        - Only post author can mark as solved
+        - Cannot mark closed posts as solved
+        - Optional: Set best answer by providing comment_id
+        
+        Request body (optional):
+        {
+            "comment_id": 123  // ID of the best answer comment
+        }
+        """
+        post = self.get_object()
+        
+        # Check if user is the post author
+        if post.author != request.user:
+            return Response(
+                {
+                    'error': 'Only the post author can mark this as solved',
+                    'detail': 'You do not have permission to perform this action.'
+                },
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check if post is closed
+        if post.is_closed:
+            return Response(
+                {
+                    'error': 'Cannot mark closed posts as solved',
+                    'detail': 'This post has been closed by a moderator.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Toggle solved status
+        post.is_solved = not post.is_solved
+        
+        if post.is_solved:
+            # Mark as solved
+            post.solved_at = now()
+            
+            # Optional: Set best answer if comment_id provided
+            comment_id = request.data.get('comment_id')
+            if comment_id:
+                try:
+                    comment = Comment.objects.get(id=comment_id, post=post)
+                    post.best_answer = comment
+                except Comment.DoesNotExist:
+                    # Invalid comment_id, but still mark as solved
+                    pass
+        else:
+            # Mark as unsolved
+            post.solved_at = None
+            post.best_answer = None
+        
+        post.save()
+        
+        return Response({
+            'status': 'success',
+            'is_solved': post.is_solved,
+            'solved_at': post.solved_at.isoformat() if post.solved_at else None,
+            'best_answer': post.best_answer.id if post.best_answer else None,
+            'message': 'Post marked as solved' if post.is_solved else 'Post marked as unsolved'
+        }, status=status.HTTP_200_OK)
 
 
 # ============================================
-# COMMENT VIEWSET (Updated for Author Filtering)
+# COMMENT VIEWSET
 # ============================================
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -329,34 +399,27 @@ class CommentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Comment.objects.select_related('author', 'post')
 
-        # ✅ filter by post
+        # Filter by post
         post_id = self.request.query_params.get('post')
         if post_id:
             queryset = queryset.filter(post_id=post_id)
 
-        # ✅ top level only (comment utama)
+        # Filter top level comments only
         top_level = self.request.query_params.get('top_level')
         if top_level == 'true':
             queryset = queryset.filter(parent__isnull=True)
 
-        # optional filters
+        # Filter by author (optional)
         author_id = self.request.query_params.get('author')
         if author_id:
             queryset = queryset.filter(author_id=author_id)
 
         return queryset
 
-
-
-
     def perform_create(self, serializer):
+        """Create comment with author"""
         serializer.save(author=self.request.user)
 
-
-
-    
-    
-    
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def like(self, request, pk=None):
         """Like/Unlike comment"""
@@ -377,6 +440,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def replies(self, request, pk=None):
+        """Get replies for a comment"""
         comment = self.get_object()
         replies = comment.replies.select_related('author')
         serializer = self.get_serializer(replies, many=True)
@@ -411,3 +475,65 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         """Mark all notifications as read"""
         Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
         return Response({'status': 'all marked as read'})
+
+
+# ============================================
+# VIEWS SUMMARY
+# ============================================
+"""
+API ENDPOINTS AVAILABLE:
+
+USER ENDPOINTS:
+  GET    /api/users/                - List users
+  GET    /api/users/{id}/           - User detail
+  GET    /api/users/me/             - Current user info
+  PUT    /api/users/update_profile/ - Update profile (with image)
+  POST   /api/users/change_password/- Change password
+
+CATEGORY ENDPOINTS:
+  GET    /api/categories/           - List categories
+  POST   /api/categories/           - Create (admin only)
+  GET    /api/categories/{slug}/    - Category detail
+  GET    /api/categories/{slug}/posts/ - Posts in category
+
+POST ENDPOINTS:
+  GET    /api/posts/                - List posts (with filters)
+  POST   /api/posts/                - Create post (with image)
+  GET    /api/posts/{id}/           - Post detail (increment views)
+  PUT    /api/posts/{id}/           - Update post
+  DELETE /api/posts/{id}/           - Delete post
+  POST   /api/posts/{id}/like/      - Like/Unlike post
+  POST   /api/posts/{id}/pin/       - Pin/Unpin (mod/admin)
+  POST   /api/posts/{id}/close/     - Close/Open (mod/admin)
+  POST   /api/posts/{id}/mark_solved/ - Mark as Solved (author only) ✅ NEW
+
+COMMENT ENDPOINTS:
+  GET    /api/comments/             - List comments (filter by post)
+  POST   /api/comments/             - Create comment
+  GET    /api/comments/{id}/        - Comment detail
+  PUT    /api/comments/{id}/        - Update comment
+  DELETE /api/comments/{id}/        - Delete comment
+  POST   /api/comments/{id}/like/   - Like/Unlike comment
+  GET    /api/comments/{id}/replies/- Get comment replies
+
+NOTIFICATION ENDPOINTS:
+  GET    /api/notifications/              - List notifications
+  POST   /api/notifications/{id}/mark_read/ - Mark as read
+  POST   /api/notifications/mark_all_read/  - Mark all read
+
+FILTERS & SEARCH:
+  ?author=<id>         - Filter by author
+  ?category=<id>       - Filter by category
+  ?filter=new          - Sort by newest
+  ?filter=top          - Sort by most comments
+  ?filter=hot          - Hot posts (last 7 days, high views)
+  ?search=<query>      - Search in title/content
+  ?top_level=true      - Only top-level comments (no replies)
+
+PERMISSIONS:
+  - Public: Can view posts/comments (read-only)
+  - Authenticated: Can create posts/comments, like, mark solved
+  - Author: Can edit/delete own content, mark own posts as solved
+  - Moderator: Can pin/close posts, delete any content
+  - Admin: Full access, can manage users and categories
+"""

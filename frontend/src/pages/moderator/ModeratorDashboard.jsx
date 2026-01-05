@@ -1,4 +1,6 @@
 // frontend/src/pages/moderator/ModeratorDashboard.jsx
+// Change semua purple → primary blue
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -86,9 +88,9 @@ const ModeratorDashboard = () => {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-lg">
-                <Shield className="w-5 h-5 text-purple-600" />
-                <span className="text-sm font-medium text-purple-900">
+              <div className="flex items-center gap-2 px-4 py-2 bg-primary-50 rounded-lg">
+                <Shield className="w-5 h-5 text-primary-600" />
+                <span className="text-sm font-medium text-primary-900">
                   {user?.username}
                 </span>
               </div>
@@ -104,45 +106,45 @@ const ModeratorDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Info Banner */}
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+        {/* Info Banner - Changed from purple to blue */}
+        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
-            <Shield className="w-6 h-6 text-purple-600 flex-shrink-0 mt-0.5" />
+            <Shield className="w-6 h-6 text-primary-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-purple-900 mb-1">Moderator Access</h3>
-              <p className="text-sm text-purple-700">
+              <h3 className="font-semibold text-primary-900 mb-1">Moderator Access</h3>
+              <p className="text-sm text-primary-700">
                 As a moderator, you can manage posts and comments (pin, close, delete), but cannot manage users or system settings.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - All Blue Theme */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Posts"
             value={stats.totalPosts}
             icon={<MessageSquare className="w-8 h-8" />}
-            color="green"
+            bgColor="bg-sky-500"
             link="/moderator/posts"
           />
           <StatCard
             title="Total Comments"
             value={stats.totalComments}
             icon={<TrendingUp className="w-8 h-8" />}
-            color="purple"
+            bgColor="bg-cyan-500"
           />
           <StatCard
             title="Pinned Posts"
             value={stats.pinnedPosts}
             icon={<CheckCircle className="w-8 h-8" />}
-            color="blue"
+            bgColor="bg-blue-500"
           />
           <StatCard
             title="Closed Posts"
             value={stats.closedPosts}
             icon={<AlertCircle className="w-8 h-8" />}
-            color="orange"
+            bgColor="bg-primary-500"
           />
         </div>
 
@@ -153,7 +155,7 @@ const ModeratorDashboard = () => {
               <h2 className="text-lg font-semibold text-gray-900">Recent Posts</h2>
               <Link 
                 to="/moderator/posts"
-                className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
               >
                 Manage All
               </Link>
@@ -167,7 +169,7 @@ const ModeratorDashboard = () => {
                     <div className="flex items-start justify-between mb-2">
                       <Link 
                         to={`/posts/${post.id}`}
-                        className="font-medium text-gray-900 hover:text-purple-600 line-clamp-1 flex-1"
+                        className="font-medium text-gray-900 hover:text-primary-600 line-clamp-1 flex-1"
                       >
                         {post.title}
                       </Link>
@@ -203,9 +205,9 @@ const ModeratorDashboard = () => {
             <div className="space-y-3">
               <Link
                 to="/moderator/posts"
-                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition"
+                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition"
               >
-                <MessageSquare className="w-6 h-6 text-purple-600" />
+                <MessageSquare className="w-6 h-6 text-primary-600" />
                 <div>
                   <p className="font-medium text-gray-900">Manage Posts</p>
                   <p className="text-sm text-gray-500">Pin, close, or delete posts</p>
@@ -214,9 +216,9 @@ const ModeratorDashboard = () => {
 
               <Link
                 to="/home"
-                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition"
+                className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition"
               >
-                <FolderOpen className="w-6 h-6 text-purple-600" />
+                <FolderOpen className="w-6 h-6 text-primary-600" />
                 <div>
                   <p className="font-medium text-gray-900">View Categories</p>
                   <p className="text-sm text-gray-500">Browse forum categories</p>
@@ -267,15 +269,8 @@ const ModeratorDashboard = () => {
   );
 };
 
-// Stat Card Component
-const StatCard = ({ title, value, icon, color, link }) => {
-  const colorClasses = {
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    purple: 'bg-purple-500',
-    orange: 'bg-orange-500',
-  };
-
+// Stat Card Component - Blue Theme
+const StatCard = ({ title, value, icon, bgColor, link }) => {
   const Card = (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
       <div className="flex items-center justify-between">
@@ -283,7 +278,7 @@ const StatCard = ({ title, value, icon, color, link }) => {
           <p className="text-gray-600 text-sm mb-1">{title}</p>
           <p className="text-3xl font-bold text-gray-900">{value}</p>
         </div>
-        <div className={`${colorClasses[color]} text-white p-3 rounded-lg`}>
+        <div className={`${bgColor} text-white p-3 rounded-lg`}>
           {icon}
         </div>
       </div>

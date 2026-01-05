@@ -4,8 +4,7 @@ Secure Authentication Views with:
 - Rate limiting
 - Email verification
 - XSS protection
-- SQL injection prevention (Django ORM handles this)
-- Account lockout
+- CSRF exempt for API endpoints (using JWT)
 """
 
 from rest_framework import status
@@ -18,6 +17,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
+from django.views.decorators.csrf import csrf_exempt  # ✅ IMPORT INI
 import bleach
 import logging
 
@@ -85,6 +85,7 @@ def validate_email_format(email):
 # REGISTRATION (with Email Verification)
 # ============================================
 
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([RegisterRateThrottle])
@@ -97,6 +98,7 @@ def register_user(request):
     - Input sanitization
     - Strong password validation
     - Email verification required
+    - CSRF exempt (using JWT)
     """
     try:
         # Sanitize inputs
@@ -179,6 +181,7 @@ def register_user(request):
 # EMAIL VERIFICATION
 # ============================================
 
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([VerifyEmailRateThrottle])
@@ -190,6 +193,7 @@ def verify_email(request):
     - Rate limited
     - Code expires in 10 minutes
     - One-time use only
+    - CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
     code = sanitize_input(request.data.get('code', ''))
@@ -261,6 +265,7 @@ def verify_email(request):
 # RESEND VERIFICATION CODE
 # ============================================
 
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([VerifyEmailRateThrottle])
@@ -271,6 +276,7 @@ def resend_verification_code(request):
     Security:
     - Rate limited
     - Max 10 attempts per hour
+    - CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
     
@@ -321,6 +327,7 @@ def resend_verification_code(request):
 # SECURE LOGIN
 # ============================================
 
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
@@ -330,6 +337,7 @@ def login_user(request):
     - Rate limiting (5 attempts/minute)
     - Account lockout (5 failed attempts = 15 min lock)
     - Email verification check
+    - CSRF exempt (using JWT)
     """
     username = sanitize_input(request.data.get('username', ''))
     password = request.data.get('password', '')  # Don't sanitize password
@@ -396,10 +404,15 @@ def login_user(request):
             'error': 'Login failed'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # ✨ NEW: Forgot Password
+
+# ============================================
+# FORGOT PASSWORD
+# ============================================
+
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@throttle_classes([VerifyEmailRateThrottle])  # Reuse same throttle
+@throttle_classes([VerifyEmailRateThrottle])
 def forgot_password(request):
     """
     Request password reset code
@@ -409,6 +422,7 @@ def forgot_password(request):
     - Code expires in 15 minutes
     - One-time use only
     - Don't reveal if email exists
+    - CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
     
@@ -458,7 +472,11 @@ def forgot_password(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# ✨ NEW: Verify Reset Code
+# ============================================
+# VERIFY RESET CODE
+# ============================================
+
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([VerifyEmailRateThrottle])
@@ -467,6 +485,7 @@ def verify_reset_code(request):
     Verify password reset code
     
     Returns a temporary token if code is valid
+    CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
     code = sanitize_input(request.data.get('code', ''))
@@ -516,7 +535,11 @@ def verify_reset_code(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# ✨ NEW: Reset Password
+# ============================================
+# RESET PASSWORD
+# ============================================
+
+@csrf_exempt  # ✅ TAMBAH INI
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([VerifyEmailRateThrottle])
@@ -528,6 +551,7 @@ def reset_password(request):
     - Requires valid reset code
     - Strong password validation
     - Code is marked as used after reset
+    - CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
     code = sanitize_input(request.data.get('code', ''))

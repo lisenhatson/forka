@@ -1,13 +1,15 @@
+// frontend/src/pages/admin/AdminDashboard.jsx
+// Update bagian StatCard dengan blue theme
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Users, MessageSquare, FolderOpen, TrendingUp, 
-  AlertCircle, CheckCircle, XCircle, Activity 
+  AlertCircle, Activity 
 } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
-// ✅ 1. IMPORT KOMPONEN BARU
 import { ProfileImage } from 'src/components/ImageDisplay';
 
 const AdminDashboard = () => {
@@ -123,33 +125,33 @@ const AdminDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
+        {/* Stats Cards - ✅ ALL BLUE NOW */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Users"
             value={stats.totalUsers}
             icon={<Users className="w-8 h-8" />}
-            color="blue"
+            bgColor="bg-blue-500"
             link="/admin/users"
           />
           <StatCard
             title="Total Posts"
             value={stats.totalPosts}
             icon={<MessageSquare className="w-8 h-8" />}
-            color="green"
+            bgColor="bg-sky-500"
             link="/admin/posts"
           />
           <StatCard
             title="Total Comments"
             value={stats.totalComments}
             icon={<TrendingUp className="w-8 h-8" />}
-            color="purple"
+            bgColor="bg-cyan-500"
           />
           <StatCard
             title="Categories"
             value={stats.totalCategories}
             icon={<FolderOpen className="w-8 h-8" />}
-            color="orange"
+            bgColor="bg-primary-500"
           />
         </div>
 
@@ -172,14 +174,11 @@ const AdminDashboard = () => {
                 {stats.recentUsers.map((user) => (
                   <div key={user.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
                     <div className="flex items-center gap-3">
-                      
-                      {/* ✅ 2. GANTI AVATAR USER */}
                       <ProfileImage
                         src={user.profile_picture}
                         username={user.username}
                         size="sm"
                       />
-                      
                       <div>
                         <p className="font-medium text-gray-900">{user.username}</p>
                         <p className="text-sm text-gray-500">{user.email}</p>
@@ -274,15 +273,8 @@ const AdminDashboard = () => {
   );
 };
 
-// Stat Card Component
-const StatCard = ({ title, value, icon, color, link }) => {
-  const colorClasses = {
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    purple: 'bg-purple-500',
-    orange: 'bg-orange-500',
-  };
-
+// ✅ Stat Card Component - Blue Theme
+const StatCard = ({ title, value, icon, bgColor, link }) => {
   const Card = (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
       <div className="flex items-center justify-between">
@@ -290,7 +282,7 @@ const StatCard = ({ title, value, icon, color, link }) => {
           <p className="text-gray-600 text-sm mb-1">{title}</p>
           <p className="text-3xl font-bold text-gray-900">{value}</p>
         </div>
-        <div className={`${colorClasses[color]} text-white p-3 rounded-lg`}>
+        <div className={`${bgColor} text-white p-3 rounded-lg`}>
           {icon}
         </div>
       </div>
