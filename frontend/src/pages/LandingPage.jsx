@@ -108,23 +108,6 @@ const LandingPage = () => {
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div className="mt-24 bg-white rounded-2xl shadow-xl p-12">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-primary-600 mb-2">150+</div>
-              <div className="text-gray-600">Pertanyaan Aktif</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary-600 mb-2">500+</div>
-              <div className="text-gray-600">Anggota Komunitas</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-primary-600 mb-2">1000+</div>
-              <div className="text-gray-600">Jawaban Terbaik</div>
-            </div>
-          </div>
-        </div>
 
         {/* CTA Section */}
         <div className="mt-24 text-center">
@@ -152,14 +135,6 @@ const LandingPage = () => {
               <p className="text-gray-400">
                 Forum Kampus Politeknik Negeri Batam
               </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Quick Links</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link to="/about" className="hover:text-white">About</Link></li>
-                <li><Link to="/login" className="hover:text-white">Login</Link></li>
-                <li><Link to="/register" className="hover:text-white">Register</Link></li>
-              </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Contact</h4>

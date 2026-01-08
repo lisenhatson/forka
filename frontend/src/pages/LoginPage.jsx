@@ -78,7 +78,6 @@ const LoginPage = () => {
               <h1 className="text-3xl font-bold text-gray-800">ForKa</h1>
             </div>
             <h2 className="text-2xl font-semibold text-gray-800">Sign In</h2>
-            <p className="text-gray-600 mt-2">More than 150 questions are waiting</p>
           </div>
 
           {/* Error Alert */}

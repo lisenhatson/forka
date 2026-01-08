@@ -6,3 +6,6 @@ WARNING 2025-11-13 23:26:23,105 log Forbidden (CSRF cookie not set.): /api/auth/
 WARNING 2025-11-18 08:03:28,171 log Forbidden (CSRF cookie not set.): /api/auth/forgot-password/
 WARNING 2026-01-03 21:46:48,123 log Forbidden (CSRF cookie not set.): /api/posts/8/mark_solved/
 WARNING 2026-01-03 22:38:28,705 log Forbidden (CSRF cookie not set.): /api/posts/9/mark_solved/
+WARNING 2026-01-06 13:30:19,124 log Forbidden (CSRF cookie not set.): /api/auth/forgot-password/
+WARNING 2026-01-06 14:00:01,756 log Forbidden (CSRF cookie not set.): /api/auth/forgot-password/
+WARNING 2026-01-06 14:06:54,201 log Forbidden (CSRF cookie not set.): /api/posts/9/mark_solved/
