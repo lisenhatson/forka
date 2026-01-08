@@ -1,6 +1,7 @@
 # backend/forka_backend/settings.py
 """
-SECURE Django settings for forka_backend project.
+JWT-ONLY SECURE Django settings for forka_backend project.
+REST API menggunakan JWT, CSRF hanya untuk Django Admin
 """
 
 from pathlib import Path
@@ -13,12 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY SETTINGS
 # ============================================
 
-# CRITICAL: Use environment variables for sensitive data
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-CHANGE-THIS-IN-PRODUCTION')
-
-# CRITICAL: Set to False in production
 DEBUG = config('DEBUG', default=False, cast=bool)
-
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 # ✨ SECURITY HEADERS
@@ -26,7 +23,7 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# ✨ HTTPS Settings (uncomment for production)
+# ✨ HTTPS Settings (production only)
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
@@ -35,10 +32,43 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-# ✨ CSRF Protection
+
+# ============================================
+# CSRF CONFIGURATION - JWT-ONLY APPROACH
+# ============================================
+
+"""
+🔒 SECURITY ARCHITECTURE:
+- REST API endpoints: JWT authentication (NO CSRF needed)
+- Django Admin: Session + CSRF protection
+- Separation of concerns: API vs Admin
+
+Why JWT doesn't need CSRF:
+1. JWT stored in localStorage (not cookies)
+2. Attacker sites can't access localStorage
+3. JWT sent manually via Authorization header
+4. Cross-site requests can't steal JWT tokens
+"""
+
+# ✅ CSRF Settings (for Django Admin only)
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_SECURE = not DEBUG
+
+# ✅ Session Settings (for Django Admin only)
+SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Strict'
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_AGE = 1209600  # 2 weeks
+
+# ✅ CSRF Trusted Origins (for Django Admin if needed)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+# ⚠️ NOTE: API endpoints akan menggunakan @csrf_exempt
+# Karena JWT sudah provide sufficient security
 
 
 # ============================================
@@ -69,7 +99,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',  # ✅ Active for Admin only
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -143,10 +173,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend'  # Development
+    default='django.core.mail.backends.console.EmailBackend'
 )
 
-# Production email settings
 EMAIL_HOST = config('EMAIL_HOST')
 EMAIL_PORT = config('EMAIL_PORT', cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
@@ -155,13 +184,12 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
 
 
-
 # ============================================
 # INTERNATIONALIZATION
 # ============================================
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Jakarta'  # ✨ Set to Indonesian timezone
+TIME_ZONE = 'Asia/Jakarta'
 USE_I18N = True
 USE_TZ = True
 
@@ -178,26 +206,23 @@ STATICFILES_DIRS = [
 
 
 # ============================================
-# MEDIA FILES (UPDATED - Fixed for serving)
+# MEDIA FILES
 # ============================================
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# ✅ File Upload Security
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB untuk posts
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 FILE_UPLOAD_PERMISSIONS = 0o644
 
-# ✅ IMPORTANT: Allowed image types
 ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 
-# ✅ AUTO CREATE MEDIA FOLDERS (Enhanced)
 def create_media_folders():
     """Automatically create media folders if they don't exist"""
     folders = [
         MEDIA_ROOT / 'profiles',
-        MEDIA_ROOT / 'posts',  # ✅ Tambahkan ini
+        MEDIA_ROOT / 'posts',
         BASE_DIR / 'staticfiles',
         BASE_DIR / 'logs',
     ]
@@ -205,68 +230,15 @@ def create_media_folders():
     for folder in folders:
         if not folder.exists():
             folder.mkdir(parents=True, exist_ok=True)
-            print(f"✅ Created folder: {folder}")
 
-# Call on startup
 create_media_folders()
 
-# ✅ CORS Configuration untuk Media Files
-CORS_ALLOW_ALL_ORIGINS = True  # Hanya untuk development!
-CORS_ALLOW_CREDENTIALS = True
-
-# ✅ Expose headers untuk media files
-CORS_EXPOSE_HEADERS = [
-    'Content-Length',
-    'Content-Type',
-    'Content-Disposition',  # ✅ Tambahkan ini
-]
-
-
 
 # ============================================
-# REST FRAMEWORK (Secure Configuration)
+# CORS CONFIGURATION (Development)
 # ============================================
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ],
-    # ✨ Rate Limiting
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',  # Anonymous users
-        'user': '1000/hour',  # Authenticated users
-        'login': '5/minute',  # Login attempts
-        'register': '3/hour',  # Registration
-        'verify_email': '10/hour',  # Email verification
-    },
-    # ✨ Pagination
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
-    # ✨ Renderer (disable browsable API in production)
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-    ] if not DEBUG else [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ],
-}
-
-
-# ============================================
-# CORS CONFIGURATION (Secure)
-# ============================================
-
-# ============================================
-# CORS CONFIGURATION (Secure)
-# ============================================
-
+# ✅ Development: Allow all (Production: specify domains)
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
@@ -282,55 +254,85 @@ CORS_ALLOW_METHODS = [
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
-    'authorization',
+    'authorization',  # ✅ IMPORTANT: For JWT token
     'content-type',
     'dnt',
     'origin',
     'user-agent',
-    'x-csrftoken',
     'x-requested-with',
 ]
 
-# ✅ CORS Expose Headers untuk Media Files
 CORS_EXPOSE_HEADERS = [
     'Content-Length',
     'Content-Type',
+    'Content-Disposition',
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000", 
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
-
-# ✅ Allow CORS for Media Files
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^http://localhost:\d+$",
-    r"^http://127\.0\.0\.1:\d+$",
-]
 
 # ============================================
-# JWT CONFIGURATION (Secure)
+# REST FRAMEWORK - JWT AUTHENTICATION
+# ============================================
+
+REST_FRAMEWORK = {
+    # ✅ JWT-ONLY Authentication
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    
+    # ✅ Rate Limiting (Security Layer)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour',
+        'login': '5/minute',
+        'register': '3/hour',
+        'verify_email': '10/hour',
+    },
+    
+    # ✅ Pagination
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    
+    # ✅ JSON Renderer (Disable Browsable API in production)
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ] if not DEBUG else [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+}
+
+
+# ============================================
+# JWT CONFIGURATION - SECURE SETTINGS
 # ============================================
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # ✨ Reduced from 1 day
+    # ✅ Token Lifetimes
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,  # ✨ Rotate on refresh
-    'BLACKLIST_AFTER_ROTATION': True,  # ✨ Blacklist old tokens
+    
+    # ✅ Security Features
+    'ROTATE_REFRESH_TOKENS': True,  # New refresh token on refresh
+    'BLACKLIST_AFTER_ROTATION': True,  # Blacklist old tokens
     'UPDATE_LAST_LOGIN': True,
     
+    # ✅ Algorithm & Key
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
     
+    # ✅ Header Configuration
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
     
-    # ✨ Token Claims
+    # ✅ Token Claims
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
@@ -384,17 +386,12 @@ LOGGING = {
 # ADDITIONAL SECURITY SETTINGS
 # ============================================
 
-# ✨ Account lockout after failed attempts
 ACCOUNT_LOCKOUT_THRESHOLD = 5
 ACCOUNT_LOCKOUT_DURATION = 15  # minutes
 
-# ✨ Email verification
 EMAIL_VERIFICATION_REQUIRED = config('EMAIL_VERIFICATION_REQUIRED', default=True, cast=bool)
 EMAIL_VERIFICATION_CODE_EXPIRY = 10  # minutes
 
-# ✨ Password reset
 PASSWORD_RESET_TIMEOUT = 3600  # 1 hour in seconds
-
-
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

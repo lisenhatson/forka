@@ -1,7 +1,7 @@
 // frontend/src/pages/ForgotPasswordPage.jsx
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, ArrowLeft, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Mail, ArrowLeft, AlertCircle, CheckCircle, X, Lock } from 'lucide-react';
 import api from 'src/config/api';
 import toast from 'react-hot-toast';
 
@@ -89,7 +89,6 @@ const ForgotPasswordPage = () => {
       await api.post('/auth/forgot-password/', { email });
       toast.success('Reset code sent to your email!');
       setStep(2);
-      // Auto-focus first OTP input
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     } catch (error) {
       console.error('❌ Forgot password error:', error);
@@ -142,7 +141,7 @@ const ForgotPasswordPage = () => {
       toast.success('Code verified! Enter your new password.');
       setStep(3);
     } catch (error) {
-      console.error('❌ Verify code error:', error);
+      console.error('❌ Verify code error:', error.response?.data);
       setError(error.response?.data?.error || 'Invalid or expired code');
       toast.error('Invalid or expired code');
     } finally {
@@ -158,7 +157,6 @@ const ForgotPasswordPage = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (passwords.new_password !== passwords.new_password2) {
       setError('Passwords do not match');
       return;
@@ -239,8 +237,8 @@ const ForgotPasswordPage = () => {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-red-600" />
+            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 text-primary-600" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               {step === 1 && 'Forgot Password?'}
@@ -276,7 +274,7 @@ const ForgotPasswordPage = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
                   required
                 />
               </div>
@@ -284,7 +282,7 @@ const ForgotPasswordPage = () => {
               <button
                 type="submit"
                 disabled={loading || !email}
-                className="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Sending...' : 'Send Reset Code'}
               </button>
@@ -301,13 +299,13 @@ const ForgotPasswordPage = () => {
                   <input
                     key={index}
                     ref={(el) => (otpRefs.current[index] = el)}
-                    type="password"
+                    type="text"
                     inputMode="numeric"
                     maxLength="1"
                     value={digit}
                     onChange={(e) => handleOtpChange(index, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition"
+                    className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition"
                   />
                 ))}
               </div>
@@ -315,7 +313,7 @@ const ForgotPasswordPage = () => {
               <button
                 onClick={handleVerifyCode}
                 disabled={loading || otpCode.join('').length !== 6}
-                className="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Verifying...' : 'Verify Code'}
               </button>
@@ -323,7 +321,7 @@ const ForgotPasswordPage = () => {
               <button
                 onClick={handleResendCode}
                 disabled={loading}
-                className="w-full text-red-600 hover:text-red-700 font-medium text-sm"
+                className="w-full text-primary-600 hover:text-primary-700 font-medium text-sm"
               >
                 Resend Code
               </button>
@@ -345,7 +343,7 @@ const ForgotPasswordPage = () => {
                   value={passwords.new_password}
                   onChange={handlePasswordChange}
                   placeholder="Enter new password"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
                   required
                 />
                 
@@ -398,7 +396,7 @@ const ForgotPasswordPage = () => {
                   value={passwords.new_password2}
                   onChange={handlePasswordChange}
                   placeholder="Confirm new password"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition"
                   required
                 />
               </div>
@@ -406,7 +404,7 @@ const ForgotPasswordPage = () => {
               <button
                 type="submit"
                 disabled={loading || passwordStrength.score < 3}
-                className="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Resetting...' : 'Reset Password'}
               </button>
@@ -415,16 +413,16 @@ const ForgotPasswordPage = () => {
 
           {/* Progress Indicator */}
           <div className="mt-8 flex items-center justify-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${step >= 1 ? 'bg-red-500' : 'bg-gray-300'}`} />
-            <div className={`w-2 h-2 rounded-full ${step >= 2 ? 'bg-red-500' : 'bg-gray-300'}`} />
-            <div className={`w-2 h-2 rounded-full ${step >= 3 ? 'bg-red-500' : 'bg-gray-300'}`} />
+            <div className={`w-2 h-2 rounded-full transition ${step >= 1 ? 'bg-primary-500' : 'bg-gray-300'}`} />
+            <div className={`w-2 h-2 rounded-full transition ${step >= 2 ? 'bg-primary-500' : 'bg-gray-300'}`} />
+            <div className={`w-2 h-2 rounded-full transition ${step >= 3 ? 'bg-primary-500' : 'bg-gray-300'}`} />
           </div>
         </div>
 
         {/* Footer */}
         <p className="text-center text-gray-600 mt-6">
           Remember your password?{' '}
-          <Link to="/login" className="text-red-600 hover:text-red-700 font-semibold">
+          <Link to="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
             Back to Login
           </Link>
         </p>
