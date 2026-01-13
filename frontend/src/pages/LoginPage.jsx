@@ -49,14 +49,6 @@ const LoginPage = () => {
             Login untuk melanjutkan diskusi dengan komunitas kampus Politeknik Negeri Batam.
           </p>
           <div className="mt-12">
-            <img 
-              src="/login-illustration.svg" 
-              alt="Login Illustration"
-              className="w-full"
-              onError={(e) => {
-                e.target.style.display = 'none';
-              }}
-            />
           </div>
         </div>
       </div>
@@ -67,9 +59,9 @@ const LoginPage = () => {
           {/* Logo & Title */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <img 
-                src="/polibatam-logo.png" 
-                alt="Polibatam Logo" 
+              <img
+                src="/polibatam-logo.png"
+                alt="Polibatam Logo"
                 className="h-12"
                 onError={(e) => {
                   e.target.style.display = 'none';
@@ -147,8 +139,8 @@ const LoginPage = () => {
                 />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
-              <Link 
-                to="/forgot-password" 
+              <Link
+                to="/forgot-password"
                 className="text-sm text-primary-600 hover:text-primary-700"
               >
                 Forgot password?
@@ -168,8 +160,8 @@ const LoginPage = () => {
           {/* Register Link */}
           <p className="mt-6 text-center text-gray-600">
             Don't have an account?{' '}
-            <Link 
-              to="/register" 
+            <Link
+              to="/register"
               className="text-primary-600 hover:text-primary-700 font-semibold"
             >
               Register
@@ -178,8 +170,8 @@ const LoginPage = () => {
 
           {/* Back to Home */}
           <div className="mt-8 text-center">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               ← Back to Home
