@@ -1,0 +1,92 @@
+services:
+  database:
+    build:
+      context: ./database
+    container_name: postgres_db
+    restart: always
+    env_file: ./database/.env
+    ports:
+      - "5432:5432"
+      - "8432:8432"
+    volumes:
+      - ./database/data_master:/var/lib/postgresql/18/docker
+      - ./database/certs:/etc/postgresql/certs:ro
+      - ./database/init-scripts:/docker-entrypoint-initdb.d
+      - ./database/pg_logs:/var/log/postgresql
+      - ./database/config/pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf
+      - ./database/pg_data:/var/lib/postgresql
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_INITDB_ARGS: ${DB_ARGS}
+    command: >
+      postgres
+      -c ssl=off
+      -c logging_collector=on
+      -c log_destination=stderr
+      -c log_directory=/var/log/postgresql
+      -c wal_level=replica
+
+  backend:
+    build:
+      context: ./backend
+    container_name: django_backend
+    restart: always
+    env_file: ./backend/.env
+    depends_on:
+      - database
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_HOST=database
+      - DB_PORT=5432
+
+  frontend-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: forka-frontend-internal
+    # volumes:
+    #   - ./config/frontend-default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend-app
+      - backend
+
+  # waf-pbl:
+  #   image: owasp/modsecurity-crs:nginx
+  #   container_name: waf-pbl-410
+  #   restart: always
+  #   ports:
+  #     - "80:8080"
+  #     - "443:8443"
+  #   environment:
+  #     - PARANOIA=1
+  #     # IMPORTANT: Point this to the service name of your frontend
+  #     - BACKEND=http://frontend-app:80
+  #     - PROXY_SSL=off
+  #     - MODSEC_RULE_ENGINE=on
+  #     - MODSEC_AUDIT_LOG_TYPE=Serial
+  #     - MODSEC_AUDIT_LOG_FORMAT=JSON
+  #     - MODSEC_AUDIT_LOG=/var/log/modsec/modsec_audit.log
+  #     - SERVER_NAME=localhost
+  #     - PORT=8080
+  #     - SSL_PORT=8443
+  #   # Comment out the volume for now to test the default logic
+  #   volumes:
+  #     - ./config/proxy_backend.conf:/etc/nginx/includes/proxy_backend.conf:ro
+  #     - ./config/api_routes.conf:/etc/nginx/conf.d/api_routes.conf:ro
+  #   depends_on:
+  #     - frontend-app
