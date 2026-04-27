@@ -1,12 +1,10 @@
-!./database/Dockerfile
-!/database/Dockerfile
-!*database/Dockerfile
+database/**
+
+!database/Dockerfile
 
 node_modules/
 .env
 dist/
 .continue/
 postgres/
-database/*
-database*
 
