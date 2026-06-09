@@ -1,5 +1,4 @@
 database/**
-
 !database/Dockerfile
 
 node_modules/

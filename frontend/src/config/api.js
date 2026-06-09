@@ -1,7 +1,7 @@
 // frontend/src/config/api.js
 import axios from 'axios';
 
-export const API_BASE_URL = 'http://localhost:8000/api';
+export const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -17,13 +17,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // ✅ Handle FormData untuk image uploads
     if (config.data instanceof FormData) {
       // Remove Content-Type, let browser set it with boundary
       delete config.headers['Content-Type'];
     }
-    
+
     return config;
   },
   (error) => {

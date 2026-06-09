@@ -25,7 +25,9 @@ X_FRAME_OPTIONS = 'DENY'
 
 # ✨ HTTPS Settings (production only)
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
+    SECURE_SSL_REDIRECT = False   # WAF handles SSL, not Django
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
@@ -82,12 +84,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third party apps
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
-    
+
     # Local apps
     'forum',
 ]
@@ -226,7 +228,7 @@ def create_media_folders():
         BASE_DIR / 'staticfiles',
         BASE_DIR / 'logs',
     ]
-    
+
     for folder in folders:
         if not folder.exists():
             folder.mkdir(parents=True, exist_ok=True)
@@ -246,7 +248,7 @@ CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
     'OPTIONS',
-    'PATCH', 
+    'PATCH',
     'POST',
     'PUT',
 ]
@@ -281,7 +283,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
-    
+
     # ✅ Rate Limiting (Security Layer)
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -294,11 +296,11 @@ REST_FRAMEWORK = {
         'register': '3/hour',
         'verify_email': '10/hour',
     },
-    
+
     # ✅ Pagination
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    
+
     # ✅ JSON Renderer (Disable Browsable API in production)
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -317,26 +319,26 @@ SIMPLE_JWT = {
     # ✅ Token Lifetimes
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    
+
     # ✅ Security Features
     'ROTATE_REFRESH_TOKENS': True,  # New refresh token on refresh
     'BLACKLIST_AFTER_ROTATION': True,  # Blacklist old tokens
     'UPDATE_LAST_LOGIN': True,
-    
+
     # ✅ Algorithm & Key
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'VERIFYING_KEY': None,
-    
+
     # ✅ Header Configuration
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    
+
     # ✅ Token Claims
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
-    
+
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
