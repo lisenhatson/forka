@@ -7,3 +7,6 @@ dist/
 .continue/
 postgres/
 
+venv/
+venv/**
+*venv*

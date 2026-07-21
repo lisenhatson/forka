@@ -21,6 +21,10 @@ from django.views.decorators.csrf import csrf_exempt  # ✅ IMPORT INI
 import bleach
 import logging
 
+from django.core import signing
+from .models import User, EmailVerification, PasswordReset, LoginMFACode
+from .email_utils import send_verification_email, send_password_reset_email, send_login_mfa_email
+
 from .models import User, EmailVerification, PasswordReset
 from .serializers import UserRegistrationSerializer, UserSerializer
 from .email_utils import send_verification_email, send_password_reset_email
@@ -47,10 +51,37 @@ class VerifyEmailRateThrottle(AnonRateThrottle):
     """10 verification attempts per hour"""
     rate = '10/hour'
 
+class MFARateThrottle(AnonRateThrottle):
+    """10 MFA verify/resend attempts per hour"""
+    rate = '10/hour'
+
 
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
+
+MFA_TOKEN_SALT = 'forka-login-mfa'
+MFA_TOKEN_MAX_AGE = 60 * 10  # seconds, matches LoginMFACode's 10-minute expiry
+
+def _make_mfa_token(user):
+    """Signed, tamper-proof stand-in for 'this user just passed the password check'."""
+    signer = signing.TimestampSigner(salt=MFA_TOKEN_SALT)
+    return signer.sign(str(user.pk))
+
+
+def _read_mfa_token(token):
+    signer = signing.TimestampSigner(salt=MFA_TOKEN_SALT)
+    try:
+        user_pk = signer.unsign(token, max_age=MFA_TOKEN_MAX_AGE)
+    except signing.SignatureExpired:
+        return None, 'expired'
+    except signing.BadSignature:
+        return None, 'invalid'
+    try:
+        return User.objects.get(pk=user_pk), None
+    except User.DoesNotExist:
+        return None, 'invalid'
+
 
 def sanitize_input(text):
     """
@@ -59,7 +90,7 @@ def sanitize_input(text):
     """
     if not text:
         return text
-    
+
     # Strip all HTML tags and attributes
     clean_text = bleach.clean(
         text,
@@ -67,7 +98,7 @@ def sanitize_input(text):
         attributes={},  # No attributes allowed
         strip=True
     )
-    
+
     return clean_text.strip()
 
 
@@ -92,7 +123,7 @@ def validate_email_format(email):
 def register_user(request):
     """
     Register new user with email verification
-    
+
     Security:
     - Rate limited (3/hour per IP)
     - Input sanitization
@@ -106,25 +137,25 @@ def register_user(request):
         data['username'] = sanitize_input(data.get('username', ''))
         data['email'] = sanitize_input(data.get('email', ''))
         data['bio'] = sanitize_input(data.get('bio', ''))
-        
+
         # Validate email format
         if not validate_email_format(data.get('email')):
             return Response({
                 'error': 'Invalid email format'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Check if email already exists
         if User.objects.filter(email=data.get('email')).exists():
             return Response({
                 'error': 'Email already registered'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Check if username already exists
         if User.objects.filter(username=data.get('username')).exists():
             return Response({
                 'error': 'Username already taken'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Validate password strength
         password = data.get('password')
         try:
@@ -133,27 +164,27 @@ def register_user(request):
             return Response({
                 'error': list(e.messages)
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Create user (atomic transaction)
         with transaction.atomic():
             serializer = UserRegistrationSerializer(data=data)
-            
+
             if not serializer.is_valid():
                 return Response(
                     serializer.errors,
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             user = serializer.save()
             user.email_verified = False  # Require email verification
             user.save()
-            
+
             # Generate and send verification code
             verification = EmailVerification.objects.create(user=user)
-            
+
             if send_verification_email(user, verification.code):
                 logger.info(f"User registered: {user.username} - Email verification sent")
-                
+
                 return Response({
                     'message': 'Registration successful! Please check your email for verification code.',
                     'user': {
@@ -169,7 +200,7 @@ def register_user(request):
                 return Response({
                     'error': 'Failed to send verification email. Please try again.'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     except Exception as e:
         logger.error(f"Registration error: {str(e)}")
         return Response({
@@ -188,7 +219,7 @@ def register_user(request):
 def verify_email(request):
     """
     Verify email with code sent to user
-    
+
     Security:
     - Rate limited
     - Code expires in 10 minutes
@@ -197,50 +228,50 @@ def verify_email(request):
     """
     email = sanitize_input(request.data.get('email', ''))
     code = sanitize_input(request.data.get('code', ''))
-    
+
     if not email or not code:
         return Response({
             'error': 'Email and code are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
-        
+
         if user.email_verified:
             return Response({
                 'error': 'Email already verified'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Find valid verification code
         verification = EmailVerification.objects.filter(
             user=user,
             code=code,
             is_used=False
         ).order_by('-created_at').first()
-        
+
         if not verification:
             return Response({
                 'error': 'Invalid verification code'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if not verification.is_valid():
             return Response({
                 'error': 'Verification code has expired'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Mark as verified
         with transaction.atomic():
             user.email_verified = True
             user.save()
-            
+
             verification.is_used = True
             verification.save()
-        
+
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
-        
+
         logger.info(f"Email verified for user: {user.username}")
-        
+
         return Response({
             'message': 'Email verified successfully!',
             'user': UserSerializer(user).data,
@@ -249,7 +280,7 @@ def verify_email(request):
                 'access': str(refresh.access_token),
             }
         }, status=status.HTTP_200_OK)
-    
+
     except User.DoesNotExist:
         return Response({
             'error': 'User not found'
@@ -272,36 +303,36 @@ def verify_email(request):
 def resend_verification_code(request):
     """
     Resend verification code
-    
+
     Security:
     - Rate limited
     - Max 10 attempts per hour
     - CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
-    
+
     if not email:
         return Response({
             'error': 'Email is required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
-        
+
         if user.email_verified:
             return Response({
                 'error': 'Email already verified'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Invalidate old codes
         EmailVerification.objects.filter(
             user=user,
             is_used=False
         ).update(is_used=True)
-        
+
         # Generate new code
         verification = EmailVerification.objects.create(user=user)
-        
+
         if send_verification_email(user, verification.code):
             return Response({
                 'message': 'Verification code sent to your email'
@@ -310,7 +341,7 @@ def resend_verification_code(request):
             return Response({
                 'error': 'Failed to send email'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     except User.DoesNotExist:
         # Don't reveal if email exists (security)
         return Response({
@@ -327,29 +358,31 @@ def resend_verification_code(request):
 # SECURE LOGIN
 # ============================================
 
-@csrf_exempt  # ✅ TAMBAH INI
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 @throttle_classes([LoginRateThrottle])
 def login_user(request):
     """
-    Secure login with:
+    Secure login, step 1 of 2:
     - Rate limiting (5 attempts/minute)
     - Account lockout (5 failed attempts = 15 min lock)
     - Email verification check
-    - CSRF exempt (using JWT)
+    - On success: emails a 6-digit MFA code and returns a temp_token
+      instead of JWTs. Call verify_login_mfa with that code to finish
+      logging in.
     """
     username = sanitize_input(request.data.get('username', ''))
     password = request.data.get('password', '')  # Don't sanitize password
-    
+
     if not username or not password:
         return Response({
             'error': 'Username and password are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(username=username)
-        
+
         # Check if account is locked
         if user.is_account_locked():
             lock_time_remaining = (user.account_locked_until - timezone.now()).seconds // 60
@@ -357,17 +390,17 @@ def login_user(request):
                 'error': f'Account locked. Try again in {lock_time_remaining} minutes.',
                 'locked_until': user.account_locked_until.isoformat()
             }, status=status.HTTP_403_FORBIDDEN)
-        
+
         # Verify password
         if not user.check_password(password):
             user.increment_failed_login()
             logger.warning(f"Failed login attempt for user: {username}")
-            
+
             return Response({
                 'error': 'Invalid credentials',
                 'attempts_remaining': 5 - user.failed_login_attempts
             }, status=status.HTTP_401_UNAUTHORIZED)
-        
+
         # Check email verification
         if not user.email_verified:
             return Response({
@@ -375,23 +408,29 @@ def login_user(request):
                 'email_verification_required': True,
                 'email': user.email
             }, status=status.HTTP_403_FORBIDDEN)
-        
-        # Successful login
+
+        # Password correct + email verified -> reset the failed-login
+        # counter now, but hold off on issuing tokens until MFA passes.
         user.reset_failed_login()
-        
-        # Generate tokens
-        refresh = RefreshToken.for_user(user)
-        
-        logger.info(f"Successful login: {username}")
-        
+
+        # Invalidate any earlier unused MFA codes for this user
+        LoginMFACode.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        mfa_code = LoginMFACode.objects.create(user=user)
+
+        if not send_login_mfa_email(user, mfa_code.code):
+            return Response({
+                'error': 'Failed to send verification code. Please try again.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        logger.info(f"Password OK for {username}, MFA code sent")
+
         return Response({
-            'user': UserSerializer(user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
+            'mfa_required': True,
+            'temp_token': _make_mfa_token(user),
+            'email': user.email,
         }, status=status.HTTP_200_OK)
-    
+
     except User.DoesNotExist:
         # Don't reveal if user exists (security)
         logger.warning(f"Login attempt for non-existent user: {username}")
@@ -404,6 +443,104 @@ def login_user(request):
             'error': 'Login failed'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([MFARateThrottle])
+def verify_login_mfa(request):
+    """
+    Secure login, step 2 of 2: check the MFA code and issue JWTs.
+
+    Response shape matches the old single-step login_user success
+    response, so the frontend's existing token/user handling still works.
+    """
+    temp_token = request.data.get('temp_token', '')
+    code = sanitize_input(request.data.get('code', ''))
+
+    if not temp_token or not code:
+        return Response({
+            'error': 'Missing token or code'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    user, token_error = _read_mfa_token(temp_token)
+    if token_error == 'expired':
+        return Response({
+            'error': 'This login session has expired. Please log in again.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    if token_error == 'invalid' or user is None:
+        return Response({
+            'error': 'Invalid login session. Please log in again.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    mfa_code = LoginMFACode.objects.filter(
+        user=user, is_used=False
+    ).order_by('-created_at').first()
+
+    if not mfa_code:
+        return Response({
+            'error': 'No active code found. Please request a new one.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if not mfa_code.is_valid():
+        return Response({
+            'error': 'Code expired or too many attempts. Please request a new one.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if mfa_code.code != code:
+        mfa_code.attempts += 1
+        mfa_code.save(update_fields=['attempts'])
+        remaining = max(mfa_code.MAX_ATTEMPTS - mfa_code.attempts, 0)
+        return Response({
+            'error': f'Incorrect code. {remaining} attempt(s) remaining.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    with transaction.atomic():
+        mfa_code.is_used = True
+        mfa_code.save(update_fields=['is_used'])
+
+    refresh = RefreshToken.for_user(user)
+
+    logger.info(f"Successful MFA login: {user.username}")
+
+    return Response({
+        'user': UserSerializer(user).data,
+        'tokens': {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }
+    }, status=status.HTTP_200_OK)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([MFARateThrottle])
+def resend_login_mfa(request):
+    """
+    Resend a fresh MFA code and rotate the temp_token's expiry window.
+    """
+    temp_token = request.data.get('temp_token', '')
+    if not temp_token:
+        return Response({'error': 'Missing token'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user, token_error = _read_mfa_token(temp_token)
+    if token_error or user is None:
+        return Response({
+            'error': 'Login session expired. Please log in again.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    LoginMFACode.objects.filter(user=user, is_used=False).update(is_used=True)
+    mfa_code = LoginMFACode.objects.create(user=user)
+
+    if not send_login_mfa_email(user, mfa_code.code):
+        return Response({
+            'error': 'Failed to resend code. Please try again.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    return Response({
+        'temp_token': _make_mfa_token(user),
+        'message': 'A new code has been sent.'
+    }, status=status.HTTP_200_OK)
 
 # ============================================
 # FORGOT PASSWORD
@@ -416,7 +553,7 @@ def login_user(request):
 def forgot_password(request):
     """
     Request password reset code
-    
+
     Security:
     - Rate limited (10/hour)
     - Code expires in 15 minutes
@@ -425,30 +562,30 @@ def forgot_password(request):
     - CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
-    
+
     if not email:
         return Response({
             'error': 'Email is required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     # Validate email format
     if not validate_email_format(email):
         return Response({
             'error': 'Invalid email format'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
-        
+
         # Invalidate old reset codes
         PasswordReset.objects.filter(
             user=user,
             is_used=False
         ).update(is_used=True)
-        
+
         # Generate new reset code
         reset_code = PasswordReset.objects.create(user=user)
-        
+
         if send_password_reset_email(user, reset_code.code):
             logger.info(f"Password reset code sent to {email}")
             return Response({
@@ -458,7 +595,7 @@ def forgot_password(request):
             return Response({
                 'error': 'Failed to send reset code'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     except User.DoesNotExist:
         # Don't reveal if email exists (security best practice)
         logger.warning(f"Password reset requested for non-existent email: {email}")
@@ -483,47 +620,47 @@ def forgot_password(request):
 def verify_reset_code(request):
     """
     Verify password reset code
-    
+
     Returns a temporary token if code is valid
     CSRF exempt (using JWT)
     """
     email = sanitize_input(request.data.get('email', ''))
     code = sanitize_input(request.data.get('code', ''))
-    
+
     if not email or not code:
         return Response({
             'error': 'Email and code are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
-        
+
         # Find valid reset code
         reset_code = PasswordReset.objects.filter(
             user=user,
             code=code,
             is_used=False
         ).order_by('-created_at').first()
-        
+
         if not reset_code:
             return Response({
                 'error': 'Invalid reset code'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if not reset_code.is_valid():
             return Response({
                 'error': 'Reset code has expired'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Code is valid, return success (don't mark as used yet)
         logger.info(f"Reset code verified for user: {user.username}")
-        
+
         return Response({
             'message': 'Code verified successfully',
             'email': email,
             'code': code  # Send back for reset password step
         }, status=status.HTTP_200_OK)
-    
+
     except User.DoesNotExist:
         return Response({
             'error': 'Invalid reset code'
@@ -546,7 +683,7 @@ def verify_reset_code(request):
 def reset_password(request):
     """
     Reset password with verified code
-    
+
     Security:
     - Requires valid reset code
     - Strong password validation
@@ -557,20 +694,20 @@ def reset_password(request):
     code = sanitize_input(request.data.get('code', ''))
     new_password = request.data.get('new_password', '')
     new_password2 = request.data.get('new_password2', '')
-    
+
     if not email or not code or not new_password or not new_password2:
         return Response({
             'error': 'All fields are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     if new_password != new_password2:
         return Response({
             'error': 'Passwords do not match'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
         user = User.objects.get(email=email)
-        
+
         # Validate password strength
         try:
             validate_password(new_password, user)
@@ -578,42 +715,42 @@ def reset_password(request):
             return Response({
                 'error': list(e.messages)
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Find valid reset code
         reset_code = PasswordReset.objects.filter(
             user=user,
             code=code,
             is_used=False
         ).order_by('-created_at').first()
-        
+
         if not reset_code:
             return Response({
                 'error': 'Invalid or expired reset code'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         if not reset_code.is_valid():
             return Response({
                 'error': 'Reset code has expired'
             }, status=status.HTTP_400_BAD_REQUEST)
-        
+
         # Reset password (atomic transaction)
         with transaction.atomic():
             user.set_password(new_password)
             user.save()
-            
+
             # Mark code as used
             reset_code.is_used = True
             reset_code.save()
-            
+
             # Reset failed login attempts
             user.reset_failed_login()
-        
+
         logger.info(f"Password reset successful for user: {user.username}")
-        
+
         return Response({
             'message': 'Password reset successfully! You can now login with your new password.'
         }, status=status.HTTP_200_OK)
-    
+
     except User.DoesNotExist:
         return Response({
             'error': 'Invalid reset code'

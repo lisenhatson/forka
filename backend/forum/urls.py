@@ -16,6 +16,8 @@ from .views_auth import (
     forgot_password,
     verify_reset_code,
     reset_password,
+    verify_login_mfa,
+    resend_login_mfa
 )
 
 
@@ -36,8 +38,10 @@ urlpatterns = [
     path('auth/forgot-password/', forgot_password, name='forgot_password'),
     path('auth/verify-reset-code/', verify_reset_code, name='verify_reset_code'),
     path('auth/reset-password/', reset_password, name='reset_password'),
+    path('auth/verify-login-mfa/', verify_login_mfa, name='verify-login-mfa'),
+    path('auth/resend-login-mfa/', resend_login_mfa, name='resend-login-mfa'),
 
-    
+
     # Router URLs
     path('', include(router.urls)),
 ]

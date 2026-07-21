@@ -1,11 +1,23 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Mail, X } from 'lucide-react';
 import useAuthStore from 'src/stores/authStore';
+import toast from 'react-hot-toast';
+
+const censorEmail = (email) => {
+  if (!email) return '';
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return email;
+  return `${localPart.substring(0, 2)}***@${domain}`;
+};
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const verifyLoginMfa = useAuthStore((state) => state.verifyLoginMfa);
+  const resendLoginMfa = useAuthStore((state) => state.resendLoginMfa);
+
+  const otpRefs = useRef([]);
 
   const [formData, setFormData] = useState({
     username: '',
@@ -14,6 +26,15 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // MFA step state
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
+  const [tempToken, setTempToken] = useState('');
+  const [mfaEmail, setMfaEmail] = useState('');
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendingOtp, setResendingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -30,13 +51,87 @@ const LoginPage = () => {
 
     const result = await login(formData.username, formData.password);
 
-    if (result.success) {
-      navigate('/home');
-    } else {
+    if (result.mfaRequired) {
+      setTempToken(result.tempToken);
+      setMfaEmail(result.email);
+      setOtpCode(['', '', '', '', '', '']);
+      setOtpError('');
+      setShowOtpModal(true);
+      toast.success(`Verification code sent to ${censorEmail(result.email)}`);
+      setTimeout(() => otpRefs.current[0]?.focus(), 100);
+    } else if (!result.success) {
       setError(result.error);
     }
 
     setIsLoading(false);
+  };
+
+  // ============================================
+  // OTP HANDLERS
+  // ============================================
+
+  const handleOtpChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;
+
+    const newOtp = [...otpCode];
+    newOtp[index] = value;
+    setOtpCode(newOtp);
+
+    if (value && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const code = otpCode.join('');
+
+    if (code.length !== 6) {
+      setOtpError('Please enter the complete 6-digit code');
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setOtpError('');
+
+    const result = await verifyLoginMfa(tempToken, code);
+
+    if (result.success) {
+      setShowOtpModal(false);
+      navigate('/home');
+    } else {
+      setOtpError(result.error);
+      setOtpCode(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+    }
+
+    setVerifyingOtp(false);
+  };
+
+  const handleResendOtp = async () => {
+    setResendingOtp(true);
+    setOtpError('');
+
+    const result = await resendLoginMfa(tempToken);
+
+    if (result.success) {
+      setTempToken(result.tempToken);
+      setOtpCode(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+      toast.success('New verification code sent!');
+    } else {
+      toast.error(result.error);
+      // Session most likely expired outright — send back to step 1
+      setShowOtpModal(false);
+      setError(result.error);
+    }
+
+    setResendingOtp(false);
   };
 
   return (
@@ -179,6 +274,75 @@ const LoginPage = () => {
           </div>
         </div>
       </div>
+
+      {/* ============================================ */}
+      {/* MFA OTP MODAL */}
+      {/* ============================================ */}
+      {showOtpModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md relative shadow-2xl">
+            <button
+              onClick={() => setShowOtpModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-primary-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Verify It's You</h3>
+              <p className="text-gray-600">
+                Code sent to <span className="font-semibold text-gray-900">{censorEmail(mfaEmail)}</span>
+              </p>
+            </div>
+
+            {otpError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-800">{otpError}</p>
+              </div>
+            )}
+
+            {/* OTP Inputs */}
+            <div className="flex gap-2 justify-center mb-6">
+              {otpCode.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={(el) => (otpRefs.current[index] = el)}
+                  type="number"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength="1"
+                  value={digit}
+                  onChange={(e) => handleOtpChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 outline-none transition"
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={handleVerifyOtp}
+              disabled={verifyingOtp || otpCode.join('').length !== 6}
+              className="w-full py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition font-semibold disabled:opacity-50 mb-4"
+            >
+              {verifyingOtp ? 'Verifying...' : 'Verify & Login'}
+            </button>
+
+            <div className="text-center">
+              <button
+                onClick={handleResendOtp}
+                disabled={resendingOtp}
+                className="text-primary-600 hover:text-primary-700 font-semibold text-sm disabled:opacity-50"
+              >
+                {resendingOtp ? 'Sending...' : 'Resend Code'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
